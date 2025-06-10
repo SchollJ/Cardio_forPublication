@@ -1,0 +1,13 @@
+"","Estimate","Est.Error","Q2.5","Q97.5"
+"Intercept",-0.22,0.51,-1.23,0.84
+"listenBPM",0.02,0.29,-0.55,0.6
+"responseBPM",3.16,0.39,2.41,3.95
+"sessionNDM",1.11,0.7,-0.29,2.47
+"session_timesession2",0.67,0.74,-0.81,2.08
+"sessionNDM:session_timesession2",-1.63,1.43,-4.39,1.18
+"listenBPM:sessionNDM",-0.15,0.46,-1.07,0.73
+"listenBPM:session_timesession2",0.11,0.51,-0.87,1.14
+"responseBPM:sessionNDM",-0.5,0.53,-1.55,0.56
+"responseBPM:session_timesession2",0.1,0.61,-1.08,1.31
+"listenBPM:sessionNDM:session_timesession2",0.12,0.89,-1.62,1.84
+"responseBPM:sessionNDM:session_timesession2",1.21,1.07,-0.93,3.32

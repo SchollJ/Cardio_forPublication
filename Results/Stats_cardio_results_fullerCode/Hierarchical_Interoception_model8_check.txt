@@ -1,0 +1,98 @@
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: Decision.num ~ DV_ResponseMinListen * (session * session_time) + (DV_ResponseMinListen * (session * session_time) | ID) 
+   Data: df (Number of observations: 2344) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Multilevel Hyperparameters:
+~ID (Number of levels: 24) 
+                                                                                                    Estimate Est.Error l-95% CI u-95% CI Rhat
+sd(Intercept)                                                                                           2.27      0.43     1.55     3.22 1.00
+sd(DV_ResponseMinListen)                                                                                1.08      0.28     0.62     1.70 1.00
+sd(sessionNDM)                                                                                          0.77      0.49     0.03     1.78 1.01
+sd(session_timesession2)                                                                                1.14      0.47     0.17     2.03 1.00
+sd(sessionNDM:session_timesession2)                                                                     0.72      0.55     0.03     2.01 1.00
+sd(DV_ResponseMinListen:sessionNDM)                                                                     0.40      0.29     0.02     1.09 1.00
+sd(DV_ResponseMinListen:session_timesession2)                                                           0.87      0.43     0.10     1.80 1.00
+sd(DV_ResponseMinListen:sessionNDM:session_timesession2)                                                0.96      0.65     0.05     2.49 1.00
+cor(Intercept,DV_ResponseMinListen)                                                                    -0.11      0.23    -0.53     0.34 1.00
+cor(Intercept,sessionNDM)                                                                              -0.03      0.30    -0.57     0.57 1.00
+cor(DV_ResponseMinListen,sessionNDM)                                                                   -0.03      0.30    -0.61     0.54 1.00
+cor(Intercept,session_timesession2)                                                                     0.06      0.27    -0.46     0.59 1.00
+cor(DV_ResponseMinListen,session_timesession2)                                                          0.18      0.27    -0.37     0.67 1.00
+cor(sessionNDM,session_timesession2)                                                                   -0.15      0.30    -0.68     0.47 1.00
+cor(Intercept,sessionNDM:session_timesession2)                                                          0.00      0.32    -0.60     0.63 1.00
+cor(DV_ResponseMinListen,sessionNDM:session_timesession2)                                               0.06      0.32    -0.57     0.66 1.00
+cor(sessionNDM,sessionNDM:session_timesession2)                                                        -0.08      0.35    -0.70     0.59 1.00
+cor(session_timesession2,sessionNDM:session_timesession2)                                              -0.11      0.34    -0.73     0.57 1.00
+cor(Intercept,DV_ResponseMinListen:sessionNDM)                                                          0.15      0.32    -0.53     0.70 1.00
+cor(DV_ResponseMinListen,DV_ResponseMinListen:sessionNDM)                                              -0.06      0.32    -0.66     0.55 1.00
+cor(sessionNDM,DV_ResponseMinListen:sessionNDM)                                                        -0.00      0.33    -0.62     0.62 1.00
+cor(session_timesession2,DV_ResponseMinListen:sessionNDM)                                              -0.01      0.33    -0.63     0.62 1.00
+cor(sessionNDM:session_timesession2,DV_ResponseMinListen:sessionNDM)                                   -0.02      0.34    -0.66     0.62 1.00
+cor(Intercept,DV_ResponseMinListen:session_timesession2)                                               -0.17      0.27    -0.66     0.38 1.00
+cor(DV_ResponseMinListen,DV_ResponseMinListen:session_timesession2)                                     0.24      0.28    -0.34     0.73 1.00
+cor(sessionNDM,DV_ResponseMinListen:session_timesession2)                                              -0.10      0.32    -0.67     0.54 1.00
+cor(session_timesession2,DV_ResponseMinListen:session_timesession2)                                     0.00      0.29    -0.56     0.58 1.00
+cor(sessionNDM:session_timesession2,DV_ResponseMinListen:session_timesession2)                         -0.01      0.33    -0.64     0.62 1.00
+cor(DV_ResponseMinListen:sessionNDM,DV_ResponseMinListen:session_timesession2)                          0.05      0.33    -0.59     0.66 1.00
+cor(Intercept,DV_ResponseMinListen:sessionNDM:session_timesession2)                                     0.10      0.31    -0.52     0.66 1.00
+cor(DV_ResponseMinListen,DV_ResponseMinListen:sessionNDM:session_timesession2)                          0.06      0.32    -0.55     0.64 1.00
+cor(sessionNDM,DV_ResponseMinListen:sessionNDM:session_timesession2)                                   -0.02      0.34    -0.66     0.63 1.00
+cor(session_timesession2,DV_ResponseMinListen:sessionNDM:session_timesession2)                         -0.04      0.33    -0.66     0.60 1.00
+cor(sessionNDM:session_timesession2,DV_ResponseMinListen:sessionNDM:session_timesession2)              -0.02      0.33    -0.65     0.61 1.00
+cor(DV_ResponseMinListen:sessionNDM,DV_ResponseMinListen:sessionNDM:session_timesession2)              -0.02      0.33    -0.65     0.61 1.00
+cor(DV_ResponseMinListen:session_timesession2,DV_ResponseMinListen:sessionNDM:session_timesession2)    -0.05      0.33    -0.65     0.60 1.00
+                                                                                                    Bulk_ESS Tail_ESS
+sd(Intercept)                                                                                           1987     2659
+sd(DV_ResponseMinListen)                                                                                2068     2608
+sd(sessionNDM)                                                                                           580     1255
+sd(session_timesession2)                                                                                 709      968
+sd(sessionNDM:session_timesession2)                                                                     1748     2329
+sd(DV_ResponseMinListen:sessionNDM)                                                                     1960     2286
+sd(DV_ResponseMinListen:session_timesession2)                                                           1698     1897
+sd(DV_ResponseMinListen:sessionNDM:session_timesession2)                                                1436     2490
+cor(Intercept,DV_ResponseMinListen)                                                                     2838     2987
+cor(Intercept,sessionNDM)                                                                               3676     2952
+cor(DV_ResponseMinListen,sessionNDM)                                                                    4052     3026
+cor(Intercept,session_timesession2)                                                                     3865     2673
+cor(DV_ResponseMinListen,session_timesession2)                                                          2380     2746
+cor(sessionNDM,session_timesession2)                                                                    1962     2431
+cor(Intercept,sessionNDM:session_timesession2)                                                          7799     3069
+cor(DV_ResponseMinListen,sessionNDM:session_timesession2)                                               5629     3381
+cor(sessionNDM,sessionNDM:session_timesession2)                                                         3967     3249
+cor(session_timesession2,sessionNDM:session_timesession2)                                               3960     3234
+cor(Intercept,DV_ResponseMinListen:sessionNDM)                                                          5916     3271
+cor(DV_ResponseMinListen,DV_ResponseMinListen:sessionNDM)                                               4843     3247
+cor(sessionNDM,DV_ResponseMinListen:sessionNDM)                                                         3998     3028
+cor(session_timesession2,DV_ResponseMinListen:sessionNDM)                                               3714     3172
+cor(sessionNDM:session_timesession2,DV_ResponseMinListen:sessionNDM)                                    2793     3425
+cor(Intercept,DV_ResponseMinListen:session_timesession2)                                                4647     2816
+cor(DV_ResponseMinListen,DV_ResponseMinListen:session_timesession2)                                     4191     3207
+cor(sessionNDM,DV_ResponseMinListen:session_timesession2)                                               2191     3008
+cor(session_timesession2,DV_ResponseMinListen:session_timesession2)                                     3306     3290
+cor(sessionNDM:session_timesession2,DV_ResponseMinListen:session_timesession2)                          2815     3459
+cor(DV_ResponseMinListen:sessionNDM,DV_ResponseMinListen:session_timesession2)                          2126     3478
+cor(Intercept,DV_ResponseMinListen:sessionNDM:session_timesession2)                                     6926     3381
+cor(DV_ResponseMinListen,DV_ResponseMinListen:sessionNDM:session_timesession2)                          5729     3393
+cor(sessionNDM,DV_ResponseMinListen:sessionNDM:session_timesession2)                                    3576     2900
+cor(session_timesession2,DV_ResponseMinListen:sessionNDM:session_timesession2)                          3902     3242
+cor(sessionNDM:session_timesession2,DV_ResponseMinListen:sessionNDM:session_timesession2)               3032     3462
+cor(DV_ResponseMinListen:sessionNDM,DV_ResponseMinListen:sessionNDM:session_timesession2)               2915     3457
+cor(DV_ResponseMinListen:session_timesession2,DV_ResponseMinListen:sessionNDM:session_timesession2)     3367     3526
+
+Regression Coefficients:
+                                                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept                                                0.42      0.58    -0.71     1.60 1.00      960     1560
+DV_ResponseMinListen                                     2.97      0.36     2.29     3.72 1.00     1969     2602
+sessionNDM                                              -0.17      0.80    -1.74     1.41 1.00     1180     1880
+session_timesession2                                    -0.30      0.84    -1.97     1.39 1.00     1215     1778
+sessionNDM:session_timesession2                         -0.20      1.56    -3.37     2.88 1.00     1143     1499
+DV_ResponseMinListen:sessionNDM                         -0.27      0.51    -1.28     0.75 1.00     1776     2203
+DV_ResponseMinListen:session_timesession2                0.24      0.62    -1.01     1.45 1.00     1901     2270
+DV_ResponseMinListen:sessionNDM:session_timesession2     0.69      1.11    -1.45     2.91 1.00     1888     2343
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).

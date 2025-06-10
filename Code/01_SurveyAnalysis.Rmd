@@ -1,0 +1,559 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+# Libraries and data
+
+Explanations for missing data for surveys:
+- participant 23 did complete all surveys, but accidentally completed the survey after the CDM session after the FIRST day of the CDM session and it was therefore removed
+- participant 12 did not complete the survey after the first intervention
+
+Explanations for missing data for cardio:
+- s04: participant very anxious about MRI scan, data removed
+- s15: technical error during data acquisition, data removed
+```{r}
+rm(list=ls())
+
+paths=list(base.path='/Users/jacquelinescholl/Documents/Experiments/Tim_Palmer/FMRI_study/Cardio_publication')
+paths$figures=file.path(paths$base.path,'Results','Figures_survey')
+paths$stats=file.path(paths$base.path,'Results','Stats_survey')
+
+library(tidyverse)
+library(ggpattern)
+library(ggpubr)  # for plotting
+library("ggsci") # for color palets for plots
+library(shinystan) # in detail inspection of stan models
+library("rstan") # observe startup messages
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+library(brms) # regression models
+library(sjPlot) # makes tables of regression models
+library(readxl)
+library(stringr)
+library(tableone) # make table
+
+
+# Read the survey data
+med.data= read.csv(file.path(paths$base.path,'Data','','Online_survey_forPublication.csv')) %>%
+  dplyr::mutate(order=factor(order))
+
+# Checks: count measures per participant (must never be more than 1)
+count = med.data %>% dplyr::group_by(ID) %>% dplyr::summarize(count.Pre=sum(this.session.type.pre_NDM_CDM=='Pre'),
+                                                                   count.NDM=sum(this.session.type.pre_NDM_CDM=='NDM'),
+                                                                   count.CDM=sum(this.session.type.pre_NDM_CDM=='CDM'))
+
+# Rename age and gender
+med.data= med.data %>% dplyr::rename(Age=age.to.use,Sex=sex.to.use)
+
+# get the IDs of participants who completed both cardio sessions so we can make sure we have that in the demographics
+cardio.done.IDs = data.frame(fullID=list.files(file.path(paths$base.path,'Data','Cardio_rawData'))) %>%
+  dplyr::mutate(ID=stringr::str_remove(fullID,'_CDM|_NDM'),
+                session=stringr::str_sub_all(fullID,-3,-1)) %>% 
+  dplyr::select(-fullID) %>% dplyr::group_by(ID) %>% dplyr::summarize(count.sessions=n())
+
+
+# We have participants with questionnaires and/or with cardio data, let's make a list
+IDs.sessions = full_join(count %>% dplyr::filter(count.NDM==1 & count.CDM==1) %>% dplyr::select(ID) %>% dplyr::mutate(surveys.done=1),
+                         cardio.done.IDs %>% dplyr::filter(count.sessions==2) %>% dplyr::select(ID) %>% dplyr::mutate(cardio.done=1), by='ID')
+```
+
+
+# Demographics
+We want to have a table with:
+- age
+- gender 
+- education
+- previous meditation experience (for different types + duration)
+- mental health
+- family history schizophrenia
+
+Each person might have computed these measures at each - take the measures from baseline, and if absent from their session 1, if absent from session 2
+
+Note that for NDM_use etc. i'm computing the mean, so it's easier for the reader to understand
+```{r}
+df= med.data %>% dplyr::select(ID, starts_with('Employment'),Education,starts_with('Schiz_Fam'), starts_with('Mental_Health'),
+                               Trauma, Years_Med,Months_Med, starts_with('Traditions'),
+                               starts_with('Use.Of.Techn'),this.session.type,Age,Sex,order) %>%
+  # meditation techniques
+  dplyr::mutate(NDM_use = rowMeans(select(., starts_with("Use.Of.Techniques_"))[, c(8,16,20,21,32)]),
+                CDM_use = rowMeans(select(., starts_with("Use.Of.Techniques_"))[, c(2,4,9,24,25)]),
+                ADM_use = rowMeans(select(., starts_with("Use.Of.Techniques_"))[, c(5,6,26,37,50)]),
+  # Family history              
+                Schiz_fam_summary = case_when(Schiz_Fam_1==1 ~7,
+                                              Schiz_Fam_2==1 ~6,
+                                              Schiz_Fam_3==1 ~5,
+                                              Schiz_Fam_4==1 ~4,
+                                              Schiz_Fam_5==1 ~3,
+                                              Schiz_Fam_6==1 ~2,
+                                              Schiz_Fam_7==1 ~1),
+                Employment = case_when(Employment_3==1 ~ 'Unemployed',
+                                       Employment_4==1 ~ 'Student',
+                                       Employment_5==1 ~ 'Homemaker',
+                                       Employment_6==1 ~ 'Retired',
+                                       Employment_7==1 ~ 'On long-term sick leave',
+                                       Employment_2==1 ~ 'Self-employed',
+                                       Employment_1==1 ~ 'Employed')) %>%
+  dplyr::select(-contains('Schiz_Fam'),-contains('Use.Of.Tech'),-contains('Traditions'),-contains('Employment_')) %>% #
+  # Mental health
+  dplyr::rename("MH_Depression"=Mental_Health_List_1, 
+                "MH_Schizophrenia"=Mental_Health_List_2,
+                "MH_Anxiety/panic"=Mental_Health_List_3, 
+                "MH_Personality disorder"=Mental_Health_List_4,
+                "MH_Bipolar"=Mental_Health_List_5, 
+                "MH_Mania"=Mental_Health_List_6, 
+                "MH_Eating disorder"=Mental_Health_List_7, 
+                "MH_OCD"=Mental_Health_List_8, 
+                "MH_Addiction"=Mental_Health_List_9,
+                "MH_Psychotic episode"=Mental_Health_List_10, 
+                "MH_Other"=Mental_Health_List_11, 
+                "MH_PTSD"=Mental_Health_List_12) %>%
+  dplyr::rename(Mental.Health.summary=Mental_Health) %>% 
+  dplyr::mutate(Mental.Health = case_when(Mental.Health.summary==0 ~ 'None',
+                                          MH_Depression ==1 & `MH_Eating disorder` ==1 & MH_Addiction==1 ~ "Depression, Eating disorder and addiction",
+                                          MH_Depression==1 ~ 'Depression',
+                                          MH_PTSD==1 ~ 'PTSD',
+                                          `MH_Personality disorder`==1 ~ 'Personality disorder'))  %>%
+  dplyr::select(-starts_with('MH_'),-Mental.Health.summary) %>%
+  dplyr::mutate(Education=recode(Education,`6`="College 16-18 years A-Levels", `7`="Some university 18+, no degree", `8`="Trade or vocational", 
+                      `9`="Bachelor's degree", `10`="Master's degree", `11`="Doctorate"),
+                Education=factor(Education,levels=c("College 16-18 years A-Levels", "Some university 18+, no degree","Trade or vocational", 
+                      "Bachelor's degree", "Master's degree","Doctorate"),ordered=T)) %>%
+  dplyr::mutate(`Meditation duration (years)` = Years_Med+Months_Med/12) %>% dplyr::select(-Years_Med,-Months_Med)
+
+
+write.csv(df,file=file.path(paths$stats,'Survey_demographics_fullTable.csv'))                  
+
+df.singleValue = data.frame()
+for (is in unique(df$ID)){
+  df.sub=data.frame(ID=is)
+  for (icol in colnames(df %>% dplyr::select(-ID))){
+    t =df %>% dplyr::filter(ID==is)
+    val.pre=t %>% dplyr::filter(this.session.type=='Pre') %>% pull(icol)
+    val.sess1=t %>% dplyr::filter(this.session.type=='After 1st intervention') %>% pull(icol)
+    val.sess2=t %>% dplyr::filter(this.session.type=='After 2nd intervention') %>% pull(icol)
+    if (!length(val.pre)==0 && !is.na(val.pre)){
+      df.sub[[icol]]=val.pre
+    }  else if (!length(val.sess1)==0 && !is.na(val.sess1)){
+      df.sub[[icol]]=val.sess1
+    } else if (!length(val.sess2)==0 && !is.na(val.sess2)){
+      df.sub[[icol]]=val.sess2
+    } else{
+      df.sub[[icol]]=NA
+    }
+  }
+  df.singleValue =bind_rows(df.singleValue,df.sub)
+}
+
+
+
+# get participants who are used in the regressions
+df=dplyr::left_join(df.singleValue ,IDs.sessions, by='ID') %>%
+  dplyr::filter(!is.na(surveys.done) | !is.na(cardio.done)) %>% dplyr::select(-ID)
+table.allParticipants = CreateTableOne(data=df)
+write.csv(print(table.allParticipants),file=file.path(paths$stats,'Survey_Demographics_allParticiapnts.csv'))
+
+# specify what data available
+df= dplyr::left_join(df.singleValue ,IDs.sessions, by='ID') %>%  #df.singleValue %>% 
+  dplyr::mutate(data.availability=case_when(cardio.done==T & surveys.done==T ~ 'Cardio.and.Survey',
+                                    cardio.done==T ~ 'Cardio.only',
+                                    surveys.done==T ~ 'Survey.only',
+                                    T ~ 'None' ),
+                data.availability=factor(data.availability,ordered=T,levels=c('Cardio.and.Survey','Cardio.only','Survey.only','None'))) %>% 
+  dplyr::select(-cardio.done,-surveys.done)
+
+table.splitParticipants.dataAvailable=CreateTableOne(data=df%>%dplyr::select(-ID),strata="data.availability")
+write.csv(print(table.splitParticipants.dataAvailable),file=file.path(paths$stats,'Survey_Demographics_allParticiapnts_splitByDataAvailability.csv'))
+
+```
+
+## Figure demographics 
+From the data frame df.singleValue created above, make two plots. In the first plot, visualize the Meditation duration (years). And in the second plot visualize NDM_use, CDM_use and ADM_use. The plots should be such that individual data points (i.e. rows) are visible, in addition to the mean and the standard deviation. The second plot,  should be faceted by the variable (i.e.  NDM_use, CDM_use and ADM_use). 
+
+Plot this for all participants
+```{r}
+df.plot=df.singleValue  #left_join(df.singleValue,IDs.sessions,by='ID') %>% dplyr::filter(cardio.done==1) 
+fontsize.axis=16
+plot.technique.Use = df.plot%>% 
+  pivot_longer(cols = c('NDM_use','CDM_use','ADM_use'), names_to = 'Technique', values_to = 'Use') %>%
+  ggplot(.,aes(x=Technique,y=Use,fill=Technique))+
+  geom_dotplot(binaxis='y', stackdir='center')+
+  theme_bw()+
+  # remove _use from the x-tick labels
+  # change the color of the dots for CDM to red and NDM to blue and ADM to black
+  scale_fill_manual(values=c('CDM_use'='red','NDM_use'='blue','ADM_use'='black'))+
+  scale_x_discrete(labels = function(x) gsub("_use", "", x)) +
+  # limit the y-axis to -0.5 to 10
+  scale_y_continuous(limits=c(-0.5,10))+
+  # add a left centered titel "B Prior technique experience"
+  ggtitle('B Prior technique experience')+
+  # remove the legend
+  theme(legend.position = 'none')+
+  # increase the fontsize of the axis labels to be the same as the title
+  theme(axis.text.x = element_text(size=fontsize.axis),
+        axis.text.y = element_text(size=fontsize.axis),
+        axis.title = element_text(size=fontsize.axis))
+
+plot.meditation.duration = ggplot(df.plot,aes(x=`Meditation duration (years)`))+
+  # make a histogram of the meditation duration of
+  #geom_histogram(breaks = c(seq(0,1,1/12),seq(2,45,1)),fill='black')+  #binwidth=1,
+  geom_histogram(binwidth=1,fill='grey',color='black')+  #
+# Label the y-axis as "Number of participants"
+# Label the x-axis as "Meditation duration (years)"
+# Add a left centered title "A Meditation experience"
+  ylab('Number of participants')+
+  xlab('Meditation duration (years)')+
+  ggtitle('Ai Prior meditation experience (years)')+
+  #scale_x_continuous(breaks = c(round(seq(0,1,4/12),1),seq(5,45,5)))+
+  theme_bw()+
+   theme(axis.text.x = element_text(size=fontsize.axis),
+        axis.text.y = element_text(size=fontsize.axis),
+        axis.title = element_text(size=fontsize.axis))
+
+# zoomed in plot for <5 years meditation
+plot.meditation.duration.lessThan1 = ggplot(df.plot%>%dplyr::filter(`Meditation duration (years)`<=1) %>% 
+                                              dplyr::mutate(`Meditation duration (months)`= `Meditation duration (years)`*12),aes(x=`Meditation duration (months)`))+
+  # make a histogram of the meditation duration of
+  geom_histogram(breaks = seq(0,12,1),fill='grey',color='black')+  #binwidth=1,
+  #geom_histogram(binwidth=0.3,fill='black')+  #
+# Label the y-axis as "Number of participants"
+# Label the x-axis as "Meditation duration (years)"
+# Add a left centered title "A Meditation experience"
+  ylab('Number of participants')+
+  xlab('Meditation duration (months)')+
+  ggtitle('Aii Prior meditation experience - zoomed in under 1 year (months)')+
+  scale_x_continuous(breaks = c(seq(0,12,2)))+
+  theme_bw()+
+   theme(axis.text.x = element_text(size=fontsize.axis),
+        axis.text.y = element_text(size=fontsize.axis),
+        axis.title = element_text(size=fontsize.axis))
+
+
+plots.demogr = ggarrange(plot.meditation.duration,plot.meditation.duration.lessThan1,plot.technique.Use,ncol=3) #,widths=c(1,1.5))
+
+# Save plots.demogr as a pdf file in the folder defined by paths$figures  
+ggexport(plots.demogr,filename=file.path(paths$figures,'Survey_Demographics_visualization.tiff'),
+                                         # it should have a resolution of 400 and be the width for a full page in a journal article
+                                         width=18*400,height=5*400,res=400)
+
+```
+
+
+
+# Regressions for survey data
+
+CAPE(CDM-NDM) ~ 1 + order. Note here that the result for order means 'the difference CDM-NDM depends on order'
+
+## Preprocess the data
+Notes:
+- ThisQ: Item 8 not used - it should be part of gastroesophageal, so added there
+- CAPE: Capra et al. 2013 boil the 20 item version down to 15 items. the 5 extra items need to be described in the paper
+- I remove 'na.rm=T' because one should not be doing that with questionnaires, instead we need to impute if items are missing!!
+- Mystical: I think we're using the 30 item version, item 30 seems to not feature in the subscales. There also seem to be 4 subscales, according to Barrett2015 and the item order seems to be very different. Asked Tim to check
+- MAIA: we don't have reverse coded items because we left out the subscales with the reverse coded items
+
+```{r}
+df = med.data %>%
+  dplyr::mutate(CAPE.Pos_total =rowSums(select(., starts_with("CAPE_Pos"))),
+                Mystical_total=rowSums(select(., starts_with("Mystical.1"))),
+                Interoception_MAIA_total=rowSums(select(., starts_with("Interoception_"))),
+                Decentering_total=rowSums(select(., starts_with("Decentering_"))),
+                Interoception_ThisQ_total=rowSums(select(., starts_with("THISQ"))),
+                # Subscales
+                ThisQ_Cardiorespiratory_Activation_s = rowSums(select(., starts_with("THISQ_Interoception_"))[, c(4, 5, 6, 16, 17, 18)]),
+                ThisQ_Cardiorespiratory_Deactivation_s = rowSums(select(., starts_with("THISQ_Interoception_"))[, c(1, 2, 3, 13, 14, 15)]),
+                ThisQ_Gastroesophageal_Sensations_s = rowSums(select(., starts_with("THISQ_Interoception_"))[, c(7, 8, 9, 10, 11, 12)]),
+                Mystical_Mystical_s = rowSums(select(., starts_with("Mystical"))[, paste0("Mystical.1_", 1:15)]),
+                Mystical_PositiveMood_s = rowSums(select(., starts_with("Mystical"))[, paste0("Mystical.1_", 16:21)]),
+                Mystical_Space_Time_s = rowSums(select(., starts_with("Mystical"))[, paste0("Mystical.1_", 22:27)]),
+                Mystical_Ineffability_s = rowSums(select(., starts_with("Mystical"))[, paste0("Mystical.1_", 28:30)]),
+                MAIA_Noticing_s = rowSums(select(., starts_with("Interoception"))[, paste0("Interoception_", 1:4)]),
+                MAIA_Attention_Regulation_s = rowSums(select(., starts_with("Interoception"))[, paste0("Interoception_", 5:11)]),
+                MAIA_Emotional_Awareness_s = rowSums(select(., starts_with("Interoception"))[, paste0("Interoception_", 12:16)]),
+                MAIA_Self_Regulation_s = rowSums(select(., starts_with("Interoception"))[, paste0("Interoception_", 17:20)]),
+                MAIA_Body_Listening_s = rowSums(select(., starts_with("Interoception"))[, paste0("Interoception_", 21:23)]),
+                MAIA_Trusting_s = rowSums(select(., starts_with("Interoception"))[, paste0("Interoception_", 24:26)]), # was 22 to 26
+                CAPE_Bizarre_Exps_s = rowSums(select(., starts_with("CAPE_Pos"))[, paste0("CAPE_Pos_", c( 9, 12, 13, 14, 15, 16, 19))]), #JS:added 19, removed 2
+                CAPE_Persecutory_Ideations_s = rowSums(select(., starts_with("CAPE_Pos"))[, paste0("CAPE_Pos_", c(1, 3, 4, 5, 11))]), #JS: relabed from delusional to persecutory, removed: 6, 7, 8, 10, 
+                CAPE_Perceptual_Anomalies_s = rowSums(select(., starts_with("CAPE_Pos"))[, paste0("CAPE_Pos_", c(17,18,20))]))%>% # JS: changed 17:20
+  dplyr::select(ID,contains('total'),contains('_s'),this.session.type.pre_NDM_CDM,order,Sex,Age)  
+q.scales=colnames(df%>%dplyr::select(-ID,-this.session.type.pre_NDM_CDM,-order,-Sex,-Age))
+
+# detect missing items
+t= as.data.frame(which(is.na(df),arr.ind=T))
+t2=df[unique(t$row),]
+
+# Just needed for control analyses
+df.pre = df %>% dplyr::filter(this.session.type.pre_NDM_CDM=='Pre') %>%
+ # dplyr::rename(CAPE.Pos_pre=CAPE.Pos_total,Mystical_pre = Mystical_total) %>%
+  dplyr::rename_with(~ paste0(.,'_pre'),-c(ID,order,Sex,Age)) 
+   
+df.wide=df %>%
+  dplyr::filter(this.session.type.pre_NDM_CDM %in% c('CDM','NDM')) %>%
+  pivot_wider(.,id_cols=c('ID','order','Sex','Age'),names_from='this.session.type.pre_NDM_CDM' , 
+              values_from=-c('ID','order','Sex','Age','this.session.type.pre_NDM_CDM')) %>%
+  dplyr::filter(!is.na(CAPE.Pos_total_CDM) & !is.na(CAPE.Pos_total_NDM))
+
+for (is in q.scales){
+  df.wide[[paste0(is,'_CDMminNDM')]] = df.wide[[paste0(is,'_CDM')]]-df.wide[[paste0(is,'_NDM')]]
+}
+df.wide.full=left_join(df.wide ,
+                  df.pre %>% dplyr::select(ID,contains('pre')), by='ID') %>% dplyr::select(-this.session.type.pre_NDM_CDM_pre)
+
+df.wide=left_join(df.wide %>%dplyr::select(-ends_with('_CDM'),-ends_with('_NDM')),
+                  df.pre %>% dplyr::select(ID,contains('pre')), by='ID') %>% dplyr::select(-this.session.type.pre_NDM_CDM_pre)
+
+
+# For illustrations
+df.long=df %>% dplyr::filter(this.session.type.pre_NDM_CDM %in% c('CDM','NDM')) %>%
+  dplyr::mutate(testing.day = case_when(this.session.type.pre_NDM_CDM =='CDM' & order=='CDM.first' ~ 1,
+                                        this.session.type.pre_NDM_CDM =='NDM' & order=='CDM.first' ~ 2,
+                                        this.session.type.pre_NDM_CDM =='CDM' & order=='NDM.first' ~ 2,
+                                        this.session.type.pre_NDM_CDM =='NDM' & order=='NDM.first' ~ 1)) %>%
+  left_join(.,df.pre %>% dplyr::select(ID,contains('pre')), by='ID') %>%
+  dplyr::rename(NDM.or.CDM=this.session.type.pre_NDM_CDM ) 
+
+
+
+# check = left_join(df.wide.full%>% dplyr::select(ID, contains('CAPE'),order,Age,Sex) %>% dplyr::rename(Age.JS=Age,Sex.JS=Sex),
+#                   tp.wide %>% dplyr::select(Subject,contains('CAPE'),Order,Age,Sex),by=c('ID'='Subject')) %>%
+#   dplyr::mutate(CAPE.CDM.check = CAPE.Pos_total_CDM==CAPE_Sum_CDM,
+#                 CAPE.NDM.check = CAPE.Pos_total_NDM ==CAPE_Sum_NDM,
+#                 CAPE.pre.check = CAPE.Pos_total_pre == CAPE_Sum_B,
+#                 Order.check    = case_when((order=='NDM.first' & Order==2) ~ T,
+#                                            (order=='CDM.first' & Order==1) ~ T,
+#                                            T ~ F),
+#                 Sex.check = Sex.JS==Sex,
+#                 Age.check = Age.JS==Age)
+# 
+
+# Write the data frame to file
+write.csv(df.wide,file=file.path(paths$base.path,'Data','Survey_wide_subcales.csv'))
+write.csv(df.long,file=file.path(paths$base.path,'Data','Survey_long_subcales.csv'))
+```
+
+## Run the models 
+In the paper, we only have Cdm_minNDM~1+oder, but as control analyses, we do more here.
+
+Note:
+- for CAPE perceptual anamolaies, there was not enough variability across participants to run the model (sum of three questions and most people ticked the lowest answer for each)
+
+```{r}
+overwrite=T
+subscales = stringr::str_remove_all(colnames(df.wide %>% dplyr::select(contains('CDMminNDM'))),'_CDMminNDM')
+
+models.file=file.path(paths$base.path,'Data_preprocessed','Surveys_regressions','Survey_models.RData')
+if (!file.exists(models.file)|overwrite==T){
+  this.scaled='scaled'
+  all.bfs=data.frame()
+  #Wide models
+  models.wide.byM= list()
+  models.wide.bySubsc= list()
+  for (isc in setdiff(subscales,'CAPE_Perceptual_Anomalies_s')){
+    
+    dfT = df.wide %>% dplyr::select(contains(isc),Sex,Age,order,ID) %>% na.omit() 
+    dfT=dfT%>%
+        dplyr::mutate_at(vars(c(contains('_pre'),Age)),scale)
+  
+    models.wide.bySubsc[[isc]] = list()
+    models.wide.bySubsc[[isc]]$orderOnly = lm(formula=paste0(isc,'_CDMminNDM~1+order'),data=dfT)
+    models.wide.bySubsc[[isc]]$order_Demogr = lm(formula=paste0(isc,'_CDMminNDM~1+order+Sex+Age'),data=dfT)
+    models.wide.bySubsc[[isc]]$order_preClin = lm(formula=paste0(isc,'_CDMminNDM~1+order+',isc,'_pre'),data=dfT)
+    models.wide.bySubsc[[isc]]$preClinOnly = lm(formula=paste0(isc,'_CDMminNDM~1+',isc,'_pre'),data=dfT)
+    models.wide.bySubsc[[isc]]$order_preClin_Demogr = lm(formula=paste0(isc,'_CDMminNDM~1+order+',isc,'_pre+Sex+Age'),data=dfT)
+    models.wide.bySubsc[[isc]]$order_preClin_Interact_Demogr = lm(formula=paste0(isc,'_CDMminNDM~1+order*',isc,'_pre'),data=dfT)
+
+    # # Computing a Bayes Factor for the absence of an effect
+    # BFs.file = file.path(paths$base.path,'Data_preprocessed','Surveys_regressions',paste0('BFs_',isc,'.RData'))
+    # if (!file.exists(BFs.file)){
+    #   priors=c(1)
+    # 
+    #   # from the long data frame, get the range of values and do the same procedure as for cardio for allowable values
+    #   #max.value = max(df.long[[isc]])
+    #   var.reg.weights = df.long %>% dplyr::select(ID,all_of(isc),NDM.or.CDM) %>% dplyr::group_by(NDM.or.CDM) %>%
+    #     dplyr::rename(y:=isc) %>% dplyr::summarize(Var = sd(y,na.rm=T)^2) #max(abs(value)))
+    #     #mean.by.cohensd0.2= 0.2*sqrt(var.reg.weights%>%dplyr::filter(NDM.or.CDM=='CDM') %>% pull(Var) + var.reg.weights%>%dplyr::filter(NDM.or.CDM=='NDM') %>% pull(Var))
+    #   mean.by.cohensd0.5= 0.5*sqrt(var.reg.weights%>%dplyr::filter(NDM.or.CDM=='CDM') %>% pull(Var) + var.reg.weights%>%dplyr::filter(NDM.or.CDM=='NDM') %>% pull(Var))
+    # 
+    #   priors=c(priors,mean.by.cohensd0.5/(0.64))
+    #   model1.string= paste0(isc,'_CDMminNDM~0+Intercept')
+    #   model2.string= paste0(isc,'_CDMminNDM~0')
+    #   model3.string= paste0(isc,'_CDMminNDM~0+Intercept+order')
+    #   BFs = func.BF_bridge_sampling(model1.string,model2.string,model3.string,dfT,priors)
+    #   save(BFs,file=BFs.file)
+    # } else{
+    #   load(BFs.file)
+    # }
+
+    #models.wide.bySubsc[[isc]]$orderOnly_BF=BFs
+                                                           
+    # The same models, but reordered for making easy tables
+    models.wide.byM$orderOnly[[isc]]           = models.wide.bySubsc[[isc]]$orderOnly 
+    models.wide.byM$order_Demogr[[isc]]        = models.wide.bySubsc[[isc]]$order_Demogr
+    models.wide.byM$order_preClin[[isc]]       = models.wide.bySubsc[[isc]]$order_preClin
+    models.wide.byM$order_preClin_Demogr[[isc]]= models.wide.bySubsc[[isc]]$order_preClin_Demogr 
+    models.wide.byM$orderOnly_BF[[isc]]        = models.wide.bySubsc[[isc]]$orderOnly_BF
+    
+
+    # Print files
+    
+  }
+  for (itype in setdiff(names(models.wide.byM),'orderOnly_BF')){
+    print(tab_model(models.wide.byM[[itype]],file=file.path(paths$stats,paste0('Survey_wideModels_allSubscales__',itype,'.html'))))
+  }
+  for (itype in names(models.wide.bySubsc)){
+    t=models.wide.bySubsc[[itype]]
+    t=t[names(t) != "orderOnly_BF"]
+                
+    print(tab_model(t,file=file.path(paths$stats,paste0('Survey_wideModels_allTypes__',itype,'.html'))))
+  }
+  out= list(models.wide.byM=models.wide.byM,models.wide.bySubsc=models.wide.bySubsc)
+  save(out,models.wide.bySubsc,file=models.file)
+} else{
+  load(models.file)
+  models.wide.byM=out$models.wide.byM
+  models.wide.bySubsc=out$models.wide.bySubsc
+}
+
+```
+  
+One-tailed tests:
+- interoception (body)
+- CAPE
+- mystical
+## Write files for JASP
+```{r}
+write.csv(df.wide %>% dplyr::select(CAPE.Pos_total_CDMminNDM) %>% na.omit() ,file=file.path(paths$stats,'CAPE.Pos_total_CDMminNDM_forJASP.csv'))
+write.csv(df.wide %>% dplyr::select(Mystical_total_CDMminNDM) %>% na.omit() ,file=file.path(paths$stats,'Mystical_total_CDMminNDM_forJASP.csv'))
+#write.csv(df.wide %>% dplyr::select(MAIA_Body_Listening_s_CDMminNDM) %>% na.omit() ,file=file.path(paths$stats,'MAIA_body_CDMminNDM_forJASP.csv'))
+write.csv(df.wide %>% dplyr::select(Interoception_MAIA_total_CDMminNDM) %>% na.omit() ,file=file.path(paths$stats,'MAIA_total_CDMminNDM_forJASP.csv'))
+
+# 
+# 
+# one.tailed.results=data.frame()
+# 
+# sds = df.long %>% dplyr::select(CAPE.Pos_total,Mystical_total,MAIA_Body_Listening_s,NDM.or.CDM) %>% dplyr::group_by(NDM.or.CDM) %>%
+#   # with dplyr::summarize_all or summarize_at summarize all columns, grouped by NDM.or.CDM to compute the variance of each column.
+#   dplyr::summarize_if(is.numeric,sd)
+#   
+# 
+# # CAPE total
+# mean.by.cohensd0.5= 0.5*sqrt((sds%>%dplyr::filter(NDM.or.CDM=='CDM') %>% pull(CAPE.Pos_total))^2 + 
+#                              (sds%>%dplyr::filter(NDM.or.CDM=='NDM') %>% pull(CAPE.Pos_total))^2)
+# dfT = df.wide %>% dplyr::select(CAPE.Pos_total_CDMminNDM) %>% na.omit() 
+# model1=brm(CAPE.Pos_total_CDMminNDM ~ 0+Intercept,data=dfT,family=gaussian(),prior=set_prior(str_c("normal(0",",",mean.by.cohensd0.5,")"),ub=0),iter=10000,warmup=1000,sample_prior = TRUE)
+# model2=brm(CAPE.Pos_total_CDMminNDM ~ 0,data=dfT,family=gaussian(),iter=10000,warmup=1000,sample_prior = TRUE)
+# 
+# 
+# # tests
+# model_priorBound=  brm(CAPE.Pos_total_CDMminNDM ~ 0+Intercept,data=dfT,family=gaussian(),prior=set_prior("normal(0,1)",ub=0),iter=10000,warmup=1000,save_pars=save_pars(all=T))
+# model_noPriorBound=brm(CAPE.Pos_total_CDMminNDM ~ 0+Intercept,data=dfT,family=gaussian(),prior=set_prior("normal(0,1)"),iter=10000,warmup=1000,sample_prior = TRUE)
+# model_noIntercept= brm(CAPE.Pos_total_CDMminNDM ~ 0,data=dfT,family=gaussian(),iter=10000,warmup=1000,save_pars=save_pars(all=T))
+# 
+# bayes_factor(model_priorBound,model_noIntercept)
+# 
+# write.csv(dfT,file=file.path(paths$stats,'CAPE.Pos_total_CDMminNDM_temp.csv'))
+# 
+# h=hypothesis(model,"Intercept<0") 
+# one.tailed.results=rbind(one.tailed.results,
+#                          data.frame(tails='oneTailed',y='CAPE.total',prior.SD=mean.by.cohensd0.2,BF.forNull=1/(h$hypothesis$Evid.Ratio))) 
+```
+
+  
+  
+# Print results for the paper - stats for regression models: 
+columns: session 1 cdm, s1 ndm, s2 cdm, s2 ndm, p-value on intercept (cdm min ndm), p-value on interaction (1st session is cdm/ndm)
+```{r}
+# compute the values for session 1, session2 cdm/ndm
+t=df %>% dplyr::filter(this.session.type.pre_NDM_CDM %in% c('CDM','NDM')) %>% dplyr::group_by(this.session.type.pre_NDM_CDM, order) %>% 
+  dplyr::select(-ID,-Sex,-Age) %>%  dplyr::summarize_all(mean,na.rm=T)
+mean.values=t %>% 
+  pivot_longer(cols = -c(this.session.type.pre_NDM_CDM,order), names_to = 'quest') %>% 
+  pivot_wider(names_from = c(this.session.type.pre_NDM_CDM,order), values_from = value) %>%
+  dplyr::mutate_if(is.numeric,~format(round(.,digits=1), nsmall = 1))
+t=df %>% dplyr::filter(this.session.type.pre_NDM_CDM %in% c('CDM','NDM')) %>% dplyr::group_by(this.session.type.pre_NDM_CDM, order) %>% 
+  dplyr::select(-ID,-Sex,-Age) %>%  dplyr::summarize_all(sd,na.rm=T)
+sd.values=t %>% 
+  pivot_longer(cols = -c(this.session.type.pre_NDM_CDM,order), names_to = 'quest') %>% 
+  pivot_wider(names_from = c(this.session.type.pre_NDM_CDM,order), values_from = value) 
+
+# merge the two data frames mean.values and sd.values so that the matching columns are combined for example for the row with column entry quest=CAPE.Pos_total, the entry for CDM_CDM.first should be 30.4 (5.30). In other words it should be the mean value from mean.values and then in round brackets the sd from sd.values. 
+mean.values.toPrint= left_join(mean.values,sd.values,by='quest') %>%
+  dplyr::mutate(CDM_CDM.first = paste0(CDM_CDM.first.x,' (',round(CDM_CDM.first.y,digits=2),')'),
+                NDM_NDM.first = paste0(NDM_NDM.first.x,' (',round(NDM_NDM.first.y,digits=2),')'),
+                CDM_NDM.first = paste0(CDM_NDM.first.x,' (',round(CDM_NDM.first.y,digits=2),')'),
+                NDM_CDM.first = paste0(NDM_CDM.first.x,' (',round(NDM_CDM.first.y,digits=2),')')) %>%
+  dplyr::select(-contains('.x'),-contains('.y')) %>%
+  dplyr::relocate(quest,CDM_CDM.first,NDM_NDM.first,CDM_NDM.first,NDM_CDM.first)
+
+# attach the p-values
+p.values = as.data.frame(sapply(models.wide.byM$orderOnly, function(x) summary(x)$coefficients[,4])) %>% rownames_to_column() %>%
+  pivot_longer(cols = -c(rowname), names_to = 'quest') %>% pivot_wider(names_from = c(rowname), values_from = value) %>% 
+  dplyr::rename(Int.p = `(Intercept)`, order.p= orderNDM.first)
+est = as.data.frame(sapply(models.wide.byM$orderOnly, function(x) summary(x)$coefficients[,1])) %>% rownames_to_column() %>%
+  pivot_longer(cols = -c(rowname), names_to = 'quest') %>% pivot_wider(names_from = c(rowname), values_from = value) %>%
+  dplyr::rename(Int.est = `(Intercept)`, order.est= orderNDM.first)
+st.err = as.data.frame(sapply(models.wide.byM$orderOnly, function(x) summary(x)$coefficients[,2])) %>% rownames_to_column() %>%
+  pivot_longer(cols = -c(rowname), names_to = 'quest') %>% pivot_wider(names_from = c(rowname), values_from = value) %>%
+  dplyr::rename(Int.se = `(Intercept)`, order.se= orderNDM.first)
+#BF = data.frame(BF=sapply(models.wide.byM$orderOnly_BF, function(x) x$hypothesis$Evid.Ratio)) %>% rownames_to_column(var='quest')
+stats= left_join(p.values,est,by='quest') %>% left_join(.,st.err,by='quest') %>% #left_join(.,BF,by='quest')%>%
+  dplyr::mutate(order.p= case_when(order.p<0.01 ~ format(round(order.p,digits=3), nsmall = 3),
+                                   T ~ format(round(order.p,digits=2), nsmall = 2)),
+                `NDM vs CDM, mean(s.e.)` = paste0(round(Int.est,digits=2),' (',round(Int.se,digits=1),')'),
+                `Order [NDM first], mean(s.e.)` = paste0(round(order.est,digits=2),' (',round(order.se,digits=1),')'),
+                `NDM vs CDM (p)`=case_when(Int.p<0.01 ~ round(Int.p,digits=3),
+                                T ~ round(Int.p,digits=2))) %>% #,
+             #   BF = round(BF,digits=1)) %>%
+  dplyr::rename(`Order [NDM first] (p)`=order.p) %>%#`BF NDM vs CDM ==0` = BF,
+  dplyr::select(quest,`NDM vs CDM, mean(s.e.)`,`NDM vs CDM (p)`,`Order [NDM first], mean(s.e.)`,`Order [NDM first] (p)`) #`BF NDM vs CDM ==0`,
+
+
+intervention.comparison.table.toPrint= left_join(mean.values.toPrint,stats,by='quest') %>%
+  dplyr::rename("CDM, session 1"=CDM_CDM.first, "CDM, session 2"=CDM_NDM.first,"NDM, session 1"=NDM_NDM.first,"NDM, session 2"=NDM_CDM.first)
+write.csv(intervention.comparison.table.toPrint,file.path(paths$stats,'Survey_Paper_means_stats.csv'))
+```
+
+# Figure: CAPE and interoception and mystical
+```{r}
+df= rbind(df.long %>% dplyr::select(ID,CAPE.Pos_total,Interoception_MAIA_total,Mystical_total, NDM.or.CDM,order),
+          df.pre  %>% dplyr::select(ID,CAPE.Pos_total_pre,Interoception_MAIA_total_pre,Mystical_total_pre,order) %>% 
+            dplyr::mutate(NDM.or.CDM='pre')%>%
+            dplyr::rename(CAPE.Pos_total=CAPE.Pos_total_pre,Interoception_MAIA_total=Interoception_MAIA_total_pre,Mystical_total=Mystical_total_pre)) %>%
+  pivot_longer(cols = c('CAPE.Pos_total','Interoception_MAIA_total','Mystical_total'), names_to = 'quest')  %>%
+  dplyr::mutate(NDM.or.CDM=factor(NDM.or.CDM, ordered=T,levels=c('pre','CDM','NDM'))) %>%
+  dplyr::filter(ID %in% df.wide$ID) %>%
+  dplyr::mutate(quest=recode(quest,"CAPE.Pos_total"="Psychosis-like exp. (CAPE)","Interoception_MAIA_total"='Interoception (MAIA)','Mystical_total'='Mystical exp.')) 
+
+# take the dataframe df and create plots of CAPE.Pos_total and of MAIA_Body_Listening_s which has on the x-axis NDM.or.CDM (with the order Pre, CDM, then NDM) and the facets are CAPE.Pos_total vs MAIA_Body_Listening_s and order. The colour should be red for CDM and blue for NDM. The plots should show the individual participants as coloured dots, with lines connecting each participant's values from Pre to CDM to NDM. These lines should be black. There should also be a dot for the mean and standard errors showing the standard error of the mean. The y-axis should be the value of the quest and the x-axis should be the order of the session. The x-axis should be labelled 'Session order' and the y-axis should be labelled 'Value'. The title of the plot should be 'Body listening and positive symptoms'. The font size of the axis labels should be 16. 
+fontsize.axis=16
+dodge_width=0.3
+p= ggplot(df,aes(x=NDM.or.CDM,y=value,colour=NDM.or.CDM))+
+  geom_line(aes(group=ID,color='black'),size=0.5)+
+  # plot the individual IDs as points with doding their positions slightly to the side
+  geom_point(aes(shape=order),size=2,alpha=0.5,position=position_jitterdodge(dodge.width=0.9))+
+  #geom_point(aes(shape=order),size=2,alpha=0.5,position=position_dodge(width=dodge_width))+
+  stat_summary(fun=mean, geom="point", aes(shape=order),size=3)+
+  stat_summary(fun.data=mean_se, geom="errorbar", width=0.2)+
+  facet_grid(quest~order,scales='free')+
+  theme_bw()+
+  labs(x='Session order',y='Value')+
+  ggtitle('')+
+  theme(axis.text=element_text(size=fontsize.axis),
+        axis.title=element_text(size=fontsize.axis),
+        legend.position = 'none')+
+  # color NDM red and CDM blue and pre black, by explicitly defining which value gets which colour rather than relying on their order
+  scale_colour_manual(values=c('pre'='black','CDM'='blue','NDM'='red'))
+  
+  # Save the figure with ggexport to the figures folder
+ggexport(p,filename =file.path(paths$figures,'Survey_Cape_Mystical_Interoception.tiff'),width=10*400,height=7*400,res=400)
+  
+
+
+
+
+```
+
+
+
+
+

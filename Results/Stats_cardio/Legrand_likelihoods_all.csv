@@ -1,0 +1,7 @@
+"","Modality","best.model","count.best.model"
+"1","Extero","logLik.avgBeep5tr",11
+"2","Extero","logLik.listenBeep",189
+"3","Extero","logLik.responseBeepOnly",18
+"4","Intero","logLik.avgBeep5tr",35
+"5","Intero","logLik.listenBeep",38
+"6","Intero","logLik.responseBeepOnly",145

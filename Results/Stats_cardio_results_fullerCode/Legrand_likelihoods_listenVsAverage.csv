@@ -1,0 +1,5 @@
+"","Modality","best.model.listenVsAvg5tr","count.best.model"
+"1","Extero","logLik.avgBeep5tr",22
+"2","Extero","logLik.listenBeep",196
+"3","Intero","logLik.avgBeep5tr",106
+"4","Intero","logLik.listenBeep",112

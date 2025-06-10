@@ -1,0 +1,37 @@
+[1] "taking the last 5 trials and averaging"
+
+Call:
+lm(formula = mean.DV_CDMminNDM.abs ~ order, data = df)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-22.2462  -5.6755  -0.7049   8.0245  17.4364 
+
+Coefficients:
+               Estimate Std. Error t value Pr(>|t|)
+(Intercept)     -0.7538     3.0431  -0.248    0.807
+orderNDM.first   4.5175     4.4949   1.005    0.326
+
+Residual standard error: 10.97 on 22 degrees of freedom
+Multiple R-squared:  0.0439,	Adjusted R-squared:  0.0004369 
+F-statistic:  1.01 on 1 and 22 DF,  p-value: 0.3258
+
+
+Call:
+lm(formula = mean.DV_CDMminNDM ~ order, data = df)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-20.6545  -8.2063   0.3385   5.0885  20.1455 
+
+Coefficients:
+               Estimate Std. Error t value Pr(>|t|)  
+(Intercept)      -5.538      3.213  -1.724   0.0988 .
+orderNDM.first    4.993      4.746   1.052   0.3042  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 11.59 on 22 degrees of freedom
+Multiple R-squared:  0.04789,	Adjusted R-squared:  0.004614 
+F-statistic: 1.107 on 1 and 22 DF,  p-value: 0.3042
+

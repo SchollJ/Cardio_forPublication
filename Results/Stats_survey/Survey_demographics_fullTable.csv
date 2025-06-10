@@ -1,0 +1,82 @@
+"","ID","Education","Trauma","this.session.type","Age","Sex","order","NDM_use","CDM_use","ADM_use","Employment","Mental.Health","Meditation duration (years)"
+"1","s12","Bachelor's degree",5,"Pre",54,"Male","NDM.first",5.2,NA,NA,"Self-employed","None",3.16666666666667
+"2","s12","Bachelor's degree",3,"After 2nd intervention",54,"Male","NDM.first",5.4,6.6,4.8,"Self-employed","None",4.16666666666667
+"3","s02","Master's degree",0,"Pre",26,"Female","CDM.first",2.6,4.4,5,"Student","None",10
+"4","s02","Master's degree",1,"After 1st intervention",26,"Female","CDM.first",2.6,5.2,4.8,"Employed","None",15.5
+"5","s02","Master's degree",0,"After 2nd intervention",26,"Female","CDM.first",3.8,7,4.8,"Student","None",10
+"6","s18","Master's degree",5,"Pre",66,"Female","NDM.first",0,1.6,0.4,"Retired","None",3.5
+"7","s18","Master's degree",5,"After 1st intervention",66,"Female","NDM.first",1.2,1.2,1.2,"Retired","None",5.5
+"8","s18","Master's degree",5,"After 2nd intervention",66,"Female","NDM.first",NA,3,2.4,"Retired","None",6.5
+"9","s09","College 16-18 years A-Levels",3,"After 1st intervention",18,"Male","NDM.first",3.6,4.8,3.4,"Student","None",0.333333333333333
+"10","s09","College 16-18 years A-Levels",3,"Pre",18,"Male","NDM.first",4,6.6,3.4,"Student","None",0.5
+"11","s09","College 16-18 years A-Levels",3,"After 2nd intervention",18,"Male","NDM.first",2.4,5,3.8,"Student","None",0.333333333333333
+"12","s04","Bachelor's degree",4,"Pre",31,"Male","NDM.first",1.8,3,3.6,"Self-employed","None",7
+"13","s04","Bachelor's degree",3,"After 1st intervention",31,"Male","NDM.first",2.2,4.4,2.8,"Self-employed","None",7
+"14","s04","Bachelor's degree",3,"After 2nd intervention",31,"Male","NDM.first",1.4,5.4,2.8,"Employed","None",7
+"15","s08","Some university 18+, no degree",8,"Pre",47,"Female","CDM.first",2,6,3.8,"Employed","Personality disorder",3
+"16","s08","Some university 18+, no degree",7,"After 2nd intervention",47,"Female","CDM.first",2.6,6.4,4.6,"Employed","Personality disorder",3.08333333333333
+"17","s23",NA,NA,"Pre",18,"Female","CDM.first",NA,NA,NA,NA,NA,NA
+"18","s23","Some university 18+, no degree",8,"After 2nd intervention",18,"Female","CDM.first",1,1.8,1.6,"Student","None",0.25
+"19","s26","Doctorate",6,"After 1st intervention",32,"Female","NDM.first",0,0.8,0.4,"Employed","None",0.333333333333333
+"20","s26","Doctorate",6,"After 2nd intervention",32,"Female","NDM.first",0,0.4,0,"Employed","None",5
+"21","s26","Doctorate",6,"Pre",32,"Female","NDM.first",0,0.8,0.4,"Homemaker","None",0.916666666666667
+"22","s24","Some university 18+, no degree",7,"Pre",19,"Female","CDM.first",0,NA,1.2,"Student","None",0.0833333333333333
+"23","s07","Bachelor's degree",7,"After 1st intervention",22,"Female","NDM.first",0.2,1,1.6,"Student","None",0.333333333333333
+"24","s07","Bachelor's degree",7,"After 2nd intervention",22,"Female","NDM.first",0.4,0.4,0.4,"Student","None",0.25
+"25","s07","Bachelor's degree",7,"Pre",22,"Female","NDM.first",0,0.4,0.4,"Student","None",0.0833333333333333
+"26","s19","Master's degree",4,"Pre",31,"Female","NDM.first",0,6,1.8,"Employed","None",8.83333333333333
+"27","s19","Master's degree",5,"After 1st intervention",31,"Female","NDM.first",0,5,2.2,"Employed","None",9
+"28","s19","Master's degree",5,"After 2nd intervention",31,"Female","NDM.first",0.2,5.4,2,"Employed","None",9
+"29","s05","Some university 18+, no degree",4,"Pre",19,"Male","CDM.first",0.6,1,0.4,"Student","None",0
+"30","s05","College 16-18 years A-Levels",2,"After 1st intervention",19,"Male","CDM.first",0,0,0,"Student","None",0
+"31","s05","College 16-18 years A-Levels",1,"After 2nd intervention",19,"Male","CDM.first",0,0,0,"Student","None",0
+"32","s16","Bachelor's degree",3,"Pre",37,"Female","NDM.first",0,1.6,1.2,"Employed","None",2.16666666666667
+"33","s16","Master's degree",6,"After 1st intervention",37,"Female","NDM.first",0,2.8,3,"Employed","None",2.25
+"34","s16","Master's degree",4,"After 2nd intervention",37,"Female","NDM.first",0,0.8,1.6,"Employed","None",2.58333333333333
+"35","s15","Doctorate",4,"Pre",37,"Male","CDM.first",3.2,8.8,1.8,"Employed","None",20
+"36","s15","Doctorate",4,"After 1st intervention",37,"Male","CDM.first",3.8,7,1.2,"Employed","None",20
+"37","s15","Doctorate",4,"After 2nd intervention",37,"Male","CDM.first",6.2,8.8,2,"Employed","None",20.0833333333333
+"38","s14","Master's degree",0,"Pre",27,"Male","NDM.first",4.6,6.6,4,"Student","None",10.9166666666667
+"39","s14","Bachelor's degree",0,"After 2nd intervention",27,"Male","NDM.first",7.8,7.2,6.6,"Student","None",13
+"40","s14","Master's degree",0,"After 1st intervention",27,"Male","NDM.first",NA,6.4,3.2,"Student","None",10.9166666666667
+"41","s21","Master's degree",7,"Pre",40,"Female","CDM.first",2,6.6,2.2,"Unemployed","None",1.25
+"42","s21","Master's degree",7,"After 1st intervention",40,"Female","CDM.first",1.8,6,2.2,"Unemployed","None",1.33333333333333
+"43","s21","Master's degree",7,"After 2nd intervention",40,"Female","CDM.first",2.2,5.2,2.4,"Unemployed","None",1.41666666666667
+"44","s01","Master's degree",2,"Pre",52,"Female","CDM.first",4.8,1.2,3,"Self-employed","Depression",23
+"45","s01","Master's degree",2,"After 1st intervention",52,"Female","CDM.first",4.4,1.6,1.8,"Self-employed","Depression",25
+"46","s01","Master's degree",2,"After 2nd intervention",52,"Female","CDM.first",4.2,4.2,3.6,"Self-employed","Depression",20
+"47","s08","Some university 18+, no degree",7,"After 1st intervention",47,"Female","CDM.first",2.2,6.4,4.2,"Employed","Personality disorder",3
+"48","s22","Bachelor's degree",2,"Pre",37,"Female","CDM.first",3.2,2.8,3.2,"Employed","None",2
+"49","s22","Bachelor's degree",2,"After 1st intervention",37,"Female","CDM.first",3.2,5.4,5.4,"Employed","None",3
+"50","s22","Bachelor's degree",3,"After 2nd intervention",37,"Female","CDM.first",3,6.4,5.6,"Employed","None",3
+"51","s10","Some university 18+, no degree",8,"Pre",40,"Female","CDM.first",0.4,5.6,5,"Self-employed","None",7.08333333333333
+"52","s10","Some university 18+, no degree",9,"After 1st intervention",40,"Female","CDM.first",1,4.8,3.6,"Self-employed","None",9
+"53","s10","Some university 18+, no degree",8,"After 2nd intervention",40,"Female","CDM.first",0.6,4.8,3.4,"Self-employed","None",7
+"54","s17","Bachelor's degree",0,"Pre",72,"Male","NDM.first",NA,NA,NA,"Retired","None",42
+"55","s27","Master's degree",2,"Pre",24,"Female","NDM.first",0.6,6,1.6,"Student","None",1
+"56","s27","Master's degree",3,"After 1st intervention",24,"Female","NDM.first",1.8,7.6,1.2,"Student","None",1
+"57","s27","Master's degree",3,"After 2nd intervention",24,"Female","NDM.first",0,9.2,1,"Student","None",1
+"58","s29","Master's degree",1,"Pre",59,"Female","CDM.first",0,3.4,0.6,"Employed","None",3
+"59","s29","Master's degree",2,"After 1st intervention",59,"Female","CDM.first",0,3,1.4,"Employed","None",5
+"60","s29","Master's degree",3,"After 2nd intervention",59,"Female","CDM.first",1.2,4.4,1,"Employed","None",5.08333333333333
+"61","s03","Trade or vocational",2,"Pre",37,"Female","CDM.first",2.6,6,NA,"Employed","None",5.5
+"62","s03","College 16-18 years A-Levels",2,"After 1st intervention",37,"Female","CDM.first",1.8,6.6,4.4,"Employed","None",5.5
+"63","s03","College 16-18 years A-Levels",2,"After 2nd intervention",37,"Female","CDM.first",1,5.8,4.4,"Employed","None",5.5
+"64","s28","Some university 18+, no degree",0,"After 1st intervention",19,"Male","CDM.first",0.4,6.2,1.8,"Student","None",0.333333333333333
+"65","s28","Some university 18+, no degree",0,"After 2nd intervention",19,"Male","CDM.first",1,4.2,1.4,"Student","None",0.416666666666667
+"66","s28","Some university 18+, no degree",0,"Pre",19,"Male","CDM.first",0,2.4,0,"Student","None",0.166666666666667
+"67","s20","Master's degree",0,"Pre",30,"Female","NDM.first",0,2.2,1.8,"Student","None",9.16666666666667
+"68","s20","Master's degree",0,"After 1st intervention",30,"Female","NDM.first",0,2.6,1.8,"Student","None",7.41666666666667
+"69","s20","Master's degree",0,"After 2nd intervention",30,"Female","NDM.first",0,2.2,1.4,"Student","None",7.41666666666667
+"70","s11","Doctorate",3,"Pre",31,"Female","CDM.first",0.4,4.4,1.8,"Employed","None",4
+"71","s11","Doctorate",3,"After 2nd intervention",31,"Female","CDM.first",0.2,4.4,2.8,"Employed","None",3
+"72","s13","College 16-18 years A-Levels",8,"Pre",46,"Female","CDM.first",1,3.6,3,"Unemployed","PTSD",5.08333333333333
+"73","s13","Some university 18+, no degree",10,"After 1st intervention",46,"Female","CDM.first",0.4,2.8,2.4,"On long-term sick leave","Depression, Eating disorder and addiction",7.08333333333333
+"74","s06","Doctorate",0,"Pre",46,"Male","NDM.first",0.6,4,0,"Employed","None",7.08333333333333
+"75","s06","Doctorate",0,"After 1st intervention",46,"Male","NDM.first",1,5.6,0.6,"Employed","None",8.08333333333333
+"76","s06","Doctorate",0,"After 2nd intervention",46,"Male","NDM.first",0.6,5.2,1,"Employed","None",8
+"77","s25","Trade or vocational",3,"Pre",43,"Female","NDM.first",2.8,6.2,3.2,"Self-employed","None",3.08333333333333
+"78","s25","Trade or vocational",3,"After 1st intervention",43,"Female","NDM.first",2.8,6.2,2.4,"Self-employed","None",4.08333333333333
+"79","s24","Some university 18+, no degree",7,"After 1st intervention",19,"Female","CDM.first",0,6.2,3,"Student","None",0.0833333333333333
+"80","s24","Some university 18+, no degree",7,"After 2nd intervention",19,"Female","CDM.first",0,5.8,2.8,NA,"None",0.166666666666667
+"81","s11","Doctorate",2,"After 1st intervention",31,"Female","CDM.first",0.2,4.6,3.2,"Employed","None",3

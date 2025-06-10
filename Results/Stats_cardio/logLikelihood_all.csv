@@ -1,0 +1,11 @@
+"","session","Modality","best.model","count.best.model"
+"1","CDM","Extero","logLik.listenBeep",21
+"2","CDM","Extero","logLik.responseBeepOnly",3
+"3","CDM","Intero","logLik.avgBeep5tr",5
+"4","CDM","Intero","logLik.listenBeep",2
+"5","CDM","Intero","logLik.responseBeepOnly",17
+"6","NDM","Extero","logLik.listenBeep",22
+"7","NDM","Extero","logLik.responseBeepOnly",2
+"8","NDM","Intero","logLik.avgBeep5tr",4
+"9","NDM","Intero","logLik.listenBeep",6
+"10","NDM","Intero","logLik.responseBeepOnly",14

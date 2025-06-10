@@ -1,0 +1,989 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+Jacqueline Scholl 2024, based on Legrand 2022 (and their R code)
+
+Note: to preprocess the heart rate signal, i.e. look for outliers, we used the systole package from LEgrand and Allen (2022) in Python and upload the results here.
+
+# Packages, loading
+Load the raw data, but also the pre-processed data, so that we can compare our and their results
+
+Data columns:
+
+- Condition: 'Less' or 'More',refers to response BPM being smaller than ('less') listenBPM
+- Modality: Extero or Intero, refers to two task conditoins, comparing either the heart beat or external sounds
+- Decision: 'Less' or 'More', refers to participants ratings
+- DecisionRT
+- Confidence: rating of confidence in the response
+- ConfidenceRT
+- ResponseCorrect: whether Decision and Condition match
+- listenBPM and responseBPM: the beats per minute of the sound/heart in the 'listening' and 'comparing' intervals
+
+
+Columns with only the sae entry for each:
+- TrialType?? all are 'psi'
+- StairCond, all 'psi'
+
+From their model?:
+- Alpha
+- EstimatedThreshold
+- EstimatedSlope
+
+From the paper:
+- rejecting trials with responses < 100ms
+- rejecting trials with 'unreliable heartbeat signal', i.e. absolute deviation around the median rule (Leys et al. 2013), i.e. outliers in average heart rate or standard deviation of pulse-to-pulse interval an outlier
+
+In the code from the original paper, they're R files are in docs>source>examples>R
+```{r}
+rm(list=ls())
+paths=list(base.path='/Users/JScholl/Documents/Collaborations/Tim_Palmer/Cardio_paper/Cardio_publication')
+#paths=list(base.path='/Users/jacquelinescholl/Documents/Experiments/Tim_Palmer/FMRI_study/Cardio_publication')
+#paths=list(base.path='C:/Users/tpalmer4/OneDrive - University of Plymouth/Meditation/Lyon/Survey and Cardioception Paper/Cardio_publication/Cardio_publication')
+paths$figures=file.path(paths$base.path,'Results','Figures_cardio')
+paths$stats=file.path(paths$base.path,'Results','Stats_cardio')
+
+
+library(tidyverse)
+library(ggpattern)
+library(ggpubr)  # for plotting
+library("ggsci") # for color palets for plots
+library(shinystan) # in detail inspection of stan models
+library("rstan") # observe startup messages
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+library(brms) # regression models
+library(tableone) # make table
+
+library(sjPlot) # makes tables of regression models
+library(readxl)
+library(stringr)
+library(fuzzyjoin)
+#library(zoo) # rolling average
+#install.packages("remotes")
+#remotes::install_github("jasp-stats/jaspTTests") # install jasp t-test
+#library(jaspTTests)
+files=list.files(file.path(paths$base.path,'Data_preprocessed','Cardio_fromPython'),pattern='pythonTaggedAllOutliersDf_',full.names = T)
+cardio.unfiltered=files %>% lapply(., read.csv) %>% do.call(rbind,.) %>% as.data.frame() %>% dplyr::filter(session!='') %>%
+  dplyr::rename(ID=nonBRIC_ID)
+
+
+# load age, gender, which session was first for them (CDM or NDM)
+med.data= read.csv(file.path(paths$base.path,'Data','','Online_survey_forPublication.csv'))   %>%
+  dplyr::select(ID,order) %>% distinct()
+cardio.unfiltered = left_join(cardio.unfiltered,med.data,by='ID') %>% # checked, this works
+  # detect RT outliers
+  dplyr::mutate(RTOutlier=DecisionRT<0.1,
+                DV_ResponseMinListen = responseBPM-listenBPM,
+                easiness_ResponseMinListen.abs= abs(responseBPM-listenBPM),
+                listen.responseBPM.mean= (listenBPM+responseBPM)/2) 
+cardio= cardio.unfiltered %>% 
+  dplyr::filter((Modality=='Extero' & RTOutlier==FALSE)|
+                (RTOutlier==FALSE & HeartRateOutlier=='False'))
+
+folders=list.files(file.path(paths$base.path,'Data','CardioceptionPaper-main','data','raw','HRD'),full.names = T)
+cardio.legrand.unfiltered= data.frame()
+for (ifold in folders){
+  ID=stringr::str_split(ifold,'/')[[1]][14]
+  cardio.legrand.unfiltered=rbind(cardio.legrand.unfiltered,
+                                  read.csv(file.path(ifold,'filtered.txt')) %>% dplyr::mutate(ID=ID))
+}
+cardio.legrand =cardio.legrand.unfiltered %>% dplyr::filter(HeartRateOutlier=='False') %>% dplyr::filter(Decision!="")
+```
+
+
+# Illustrations
+(Not so important for the paper)
+To look at data quality:
+- number of trials removed based on heart rate measure or on RT
+- average % accuracy
+
+To understand the task (for this just using the good data:
+- difference between listen and response BPM; separately for the two modalities
+- % choice against difference listen and response (for the two modalities separately). If we were to fit hierarchical models, we could get that automatically
+- histogram of decision RTs
+- histogram of confidence ratings, for the two conditions
+
+
+```{r}
+# Outliers
+outlier.summaries=cardio.unfiltered %>% dplyr::group_by(ID,session) %>% 
+  dplyr::mutate(Correct=case_when(ResponseCorrect=='True'~1,
+                              ResponseCorrect=='False'~0)) %>%
+  dplyr::summarize(ntr=n(),
+                   count.heartRateOutlier=sum(HeartRateOutlier=='True',na.rm=T),
+                   count.RTOutlier=sum(RTOutlier==T,na.rm=T),
+                   count.allOutliers=sum(HeartRateOutlier=='True' | RTOutlier==T,na.rm=T),
+                   perc.correct = mean(Correct,na.rm=T))
+
+plots=list()
+heart = gghistogram(outlier.summaries,x='count.heartRateOutlier',ylab='Sessions')
+rt = gghistogram(outlier.summaries,x='count.RTOutlier',ylab='Sessions')
+all = gghistogram(outlier.summaries,x='count.allOutliers',ylab='Sessions')
+accuracy=gghistogram(outlier.summaries,x='perc.correct',ylab='Sessions')
+plots$Outliers = ggarrange(heart,rt,all,accuracy,nrow=2,ncol=2)
+
+# Task responses by modality
+distr.difficulties = gghistogram(cardio, x='DV_ResponseMinListen',facet.by='Modality')
+distr.difficulties.session = gghistogram(cardio, x='DV_ResponseMinListen',color='session',facet.by='Modality')
+decisionRT = gghistogram(cardio, x='DecisionRT',facet.by='Modality')
+ConfidenceRT = gghistogram(cardio, x='ConfidenceRT',facet.by='Modality')
+Confidence = gghistogram(cardio, x='Confidence',facet.by='Modality')
+ResponseCorrect = gghistogram(cardio, x='ResponseCorrect',facet.by='Modality',stat='count')
+plots$resps.by.modality = ggarrange(distr.difficulties,decisionRT,ConfidenceRT,Confidence,ResponseCorrect,
+                                    nrow=5,ncol=1)
+
+plots$confidence.difficulty=ggscatter(cardio,x='easiness_ResponseMinListen.abs',y='Confidence',facet.by='Modality')
+
+ggexport(plots,filename=file.path(paths$figures,'Interoception_DataExploration.pdf'))
+
+# Summary tables
+outliers.table=tableone::CreateTableOne(data=outlier.summaries %>% dplyr::ungroup() %>% dplyr::select(-ID),strata='session')
+df = cardio %>% dplyr::ungroup() %>% dplyr::select(Modality,DecisionRT,Confidence,ResponseCorrect,DV_ResponseMinListen,ID,session) %>%
+  dplyr::group_by(ID,session,Modality) %>% dplyr::summarize(DV_ResponseMinListen.mean=mean(DV_ResponseMinListen),
+                                                                 DV_ResponseMinListen.sd=sd(DV_ResponseMinListen),
+                                                                 DV_ResponseMinListen.abs=mean(abs(DV_ResponseMinListen)),
+                                                                 ResponseCorrect = mean(ResponseCorrect=="True",na.rm=T))
+task.comparisons = tableone::CreateTableOne(data=df %>%dplyr::ungroup() %>%  
+                                              dplyr::select(Modality,DV_ResponseMinListen.mean,DV_ResponseMinListen.sd,DV_ResponseMinListen.abs,ResponseCorrect),
+                                            strata=c('Modality'))
+
+write.csv(print(outliers.table),file=file.path(paths$stats,'Interoception_outliers.csv'))
+write.csv(print(task.comparisons),file=file.path(paths$stats,'Interoception_InteroExtero_comparisons.csv'))
+```
+
+
+
+
+# Control analyses - mean heart rate
+In theory the meditation interventions (or order) could have changed the overall heart rate mean. Given that this was in fact the case, we later perform control regressions (i.e. including mean heart rate as an individual difference effect). 
+It is also possible (though it wasn't the case) that it could have changed heart rate variability. This could have been particularly problematic from a technical point of view because it changes the range of regressors. 
+
+JS 10/6/2025: detected a mistake in computing the heart rates - we did not filter by Modality and in the exteroception, that is the sound not the heart rate. This is fixed now, need to redo tables in the paper.
+```{r}
+heart.rates.mean.sd= cardio %>% 
+  dplyr::filter(Modality=='Intero') %>% group_by(ID,session,order) %>% 
+  dplyr::summarize(listenBPM.mean=mean(listenBPM),
+                   listenBPM.sd  = sd(listenBPM)) %>% 
+  pivot_wider(.,id_cols=c('ID','order'),names_from='session',values_from=c('listenBPM.mean','listenBPM.sd')) %>% 
+  dplyr::mutate(heartRate.mean_cdm_min_ndm = listenBPM.mean_CDM-listenBPM.mean_NDM,
+                heartRate.sd_cdm_min_ndm = listenBPM.sd_CDM-listenBPM.sd_NDM)
+
+lm.heartrate.mean=lm(heartRate.mean_cdm_min_ndm~ 1+order,data=heart.rates.mean.sd)
+lm.heartrate.sd=lm(heartRate.sd_cdm_min_ndm~ 1+order,data=heart.rates.mean.sd)
+sink(file.path(paths$stats,'HeartRate_session_meansSds_regressions.txt'))
+summary(lm.heartrate.mean)
+summary(lm.heartrate.sd)
+print('mean heart rates and sds')
+sink()
+write.csv(heart.rates.mean.sd %>% dplyr::ungroup() %>% dplyr::summarize_if(is.numeric,mean),file=file.path(paths$stats,'HeartRate_session_meansSds.csv'))
+
+                                                     
+```
+
+
+
+# Fit models for each person, for each session, for each condition:
+- choice (more/less) ~ stimulus difficulty + ? stimulus per se + ? response repetition bias?
+- confidence: they have the relationship between confidence and ground truth accuracy
+
+
+Key models for the paper: choice and confidence
+##Fit
+Note that the scaling was done across all subjects, on an ungrouped data frame, not within each person.This makes sense because the task difficulty was individually adjusted, so z-scoring within each person could have removed individual differences we are interested in.
+
+Control analyses:
+- includ mean(heart+sound)
+- heart and sound separately
+- basic, non-zscored (for plotting)
+- for log likelihoods: use non-zscored
+```{r}
+results.indivModalities=data.frame()
+results.indivModalities.notScaled.forPlot=data.frame()
+results.logLiks = data.frame()
+
+cardio.scaled=cardio %>% dplyr::ungroup() %>%
+  dplyr::mutate_at(vars(c('DV_ResponseMinListen','easiness_ResponseMinListen.abs','DecisionRT','Confidence',
+                          'listenBPM','listen.responseBPM.mean','responseBPM')),scale)
+for (isub in unique(cardio$ID)){
+  dft=cardio.scaled %>% dplyr::filter(ID==isub) %>%
+    dplyr::mutate(Decision = recode(Decision,'More'=1,'Less'=0))
+  dft.nonScaled=cardio %>% dplyr::ungroup() %>% dplyr::filter(ID==isub) %>%
+    dplyr::mutate(Decision = recode(Decision,'More'=1,'Less'=0))
+  for (isess in unique(dft$session)){
+    for (imod in unique(dft$Modality)){
+      df= dft %>% dplyr::filter(session==isess & Modality==imod)
+      df.nonScaled = dft.nonScaled %>% dplyr::filter(session==isess & Modality==imod)
+     # Separately for each condition
+      glms=list()
+      glms$dec = glm(Decision~ DV_ResponseMinListen,data=df,family='binomial')
+      # Control analyses
+      glms$dec.withAvgListenResponseBPM = glm(Decision~ DV_ResponseMinListen+ listen.responseBPM.mean,data=df,family='binomial')
+      glms$dec.listenRespBPMsep = glm(Decision~ listenBPM+responseBPM,data=df,family='binomial')
+     
+      # We're using NA omit to make sure there is the same number of data points for each (this should anyway be the case, it wasnt before when we had yet another model - that did not perform well - that computed DV comparing sound minus average sound of last 5 or so trials)
+      df.comparison= df.nonScaled %>% dplyr::select(Decision,DV_ResponseMinListen,responseBPM) %>% na.omit()
+      glms$forLogLik.listenBeep = glm(Decision ~ DV_ResponseMinListen,data=df.comparison,family='binomial')
+      glms$forLogLik.responseBeepOnly = glm(Decision ~ responseBPM,data=df.comparison,family='binomial')
+      
+      results.logLiks=bind_rows(results.logLiks,
+                                data.frame(ID=isub,session=isess,Modality=imod,order=df.nonScaled$order[1],
+                                           logLik.listenBeep=logLik(glms$forLogLik.listenBeep),
+                                           logLik.responseBeepOnly = logLik( glms$forLogLik.responseBeepOnly),
+                                           nobs.listenBeep = nobs(glms$forLogLik.listenBeep),
+                                           nobs.responseBeepOnly = nobs(glms$forLogLik.responseBeepOnly)))
+      
+       glms$conf= lm(Confidence ~ easiness_ResponseMinListen.abs,data=df)
+      for (ireg in names(glms)){
+        t=as.data.frame(summary(glms[[ireg]])$coefficients) %>% tibble::rownames_to_column() %>%
+          dplyr::mutate(ID=isub,session=isess,Modality=imod,regression=ireg)
+        results.indivModalities=bind_rows(results.indivModalities,t)
+      }
+      # For the plot also without scaling
+      df.notscaled= cardio %>%  dplyr::filter(ID==isub & session==isess & Modality==imod) %>%
+        dplyr::mutate(Decision = recode(Decision,'More'=1,'Less'=0))
+      glms.dec.notScaled=list()
+      glms.dec.notScaled$dec= glm(Decision~DV_ResponseMinListen,data=df.notscaled,family='binomial')
+      glms.dec.notScaled$dec.listenRespBPMsep = glm(Decision~ listenBPM+responseBPM,data=df,family='binomial')
+      for (ireg in names(glms.dec.notScaled)){
+        t=as.data.frame(summary(glms.dec.notScaled[[ireg]])$coefficients) %>% tibble::rownames_to_column() %>%
+          dplyr::mutate(ID=isub,session=isess,Modality=imod,regression=ireg)
+        results.indivModalities.notScaled.forPlot = bind_rows(results.indivModalities.notScaled.forPlot,t)
+      }
+    }
+    
+  }
+}
+
+results.indivModalities=results.indivModalities %>% dplyr::mutate(rowname=recode(rowname,`(Intercept)` = 'Intercept')) %>%
+  left_join(.,med.data,by='ID')
+write.csv(results.indivModalities,file=file.path(paths$base.path,'Data_preprocessed','Interoception_Regression_withinSubjRegression.csv'))
+t= results.indivModalities %>% dplyr::filter(regression=='dec') %>% dplyr::select(-`Std. Error`,-`z value`,-`t value`,-`Pr(>|t|)`) %>%
+    pivot_wider(.,id_cols=c('ID','rowname','order'),values_from='Estimate',names_from=c('session','Modality')) %>% #'Age','Sex',
+    dplyr::mutate(Extero_CDMmNDM = CDM_Extero-NDM_Extero,
+                  Intero_CDMmNDM = CDM_Intero-NDM_Intero)
+# Write data so it can be read easily into JASP for computing Bayes Factors
+write.csv(t %>% dplyr::filter(rowname=="DV_ResponseMinListen"),file=file.path(paths$stats,'Interoception_Regression_withinSubjRegressio_dec_DVResponseMinListen.csv'))
+write.csv(t %>% dplyr::filter(rowname=="Intercept")%>%
+            dplyr::mutate(Intero_absCDM_m_absNDM=abs(CDM_Intero)-abs(NDM_Intero)),
+          file=file.path(paths$stats,'Interoception_Regression_withinSubjRegressio_dec_absIntercept.csv'))
+
+```
+
+
+##Analyse the regression weights
+Bayes factors to be done with JASP.
+Here we'll compute for each regressor (including intercept) in each regression (which are again separate for interoception and exteroception):
+[1] General measures
+- Average value for each intervention (CDM and NDM), as well as t-tests whether regression weights are significant separately in each
+- Average values and t-tests across the two sessions (for each person make first the average across CDM and NDM)
+[2] Intervention comparisons (CDM minus NDM):
+- controlling only for order: reg_weight_CDM_minus_NDM ~ 1 + order [so the intercept here will capture whether there is a difference between CDM and NDM and order whether the difference CDM vs NDM is affected by order of doing CDM or NDM first]
+[3] Control analyses: the sessions differed in mean heart rate. And while they did not differ in heartrate SD, we nevertheless also controlled for this
+```{r}
+session.comparisons=data.frame()
+
+for (itype in unique(results.indivModalities$regression)){ 
+# make the difference CDM min NDM
+  dft1=results.indivModalities %>% dplyr::filter(regression==itype) %>% dplyr::select(-`Std. Error`,-`z value`,-`t value`,-`Pr(>|t|)`,-'Pr(>|z|)')
+  if (itype=='dec.listenRespBPMsep'){ # for this one add a row that combines them
+    t = dft1 %>% 
+      pivot_wider(.,id_cols=c('ID','order','session','Modality','regression'),values_from='Estimate',names_from='rowname') %>%
+      dplyr::mutate(listen_minus_responseBPM_beta = listenBPM-responseBPM) %>% 
+      dplyr::select(ID,order,session,Modality,listen_minus_responseBPM_beta,regression) %>%
+      pivot_longer(.,cols=c('listen_minus_responseBPM_beta'),names_to='rowname',values_to='Estimate') 
+    dft1= bind_rows(dft1,t)  
+  }
+  dft = dft1 %>%
+    pivot_wider(.,id_cols=c('ID','rowname','order'),values_from='Estimate',names_from=c('session','Modality')) %>% #'Age','Sex',
+    dplyr::mutate(Extero_CDMmNDM = CDM_Extero-NDM_Extero,
+                  Intero_CDMmNDM = CDM_Intero-NDM_Intero,
+                  # new:across sessions:
+                  Extero_CDMandNDM = (CDM_Extero+NDM_Extero)/2,
+                  Intero_CDMandNDM = (CDM_Intero+NDM_Intero)/2)
+  
+  
+  # when itype is dec, let's also test the absolute
+  if (stringr::str_detect(itype,'dec')){ 
+    t= dft %>% dplyr::filter(rowname=='Intercept') %>%
+      dplyr::mutate(rowname=recode(rowname,Intercept="Intercept.abs"),
+                    Intero_CDMmNDM=abs(CDM_Intero)-abs(NDM_Intero),
+                    Extero_CDMmNDM=abs(CDM_Extero)-abs(NDM_Extero),
+                    Extero_CDMandNDM = (abs(CDM_Extero)+abs(NDM_Extero))/2,
+                    Intero_CDMandNDM = (abs(CDM_Intero)+abs(NDM_Intero))/2,
+                    CDM_Intero=abs(CDM_Intero),
+                    NDM_Intero=abs(NDM_Intero),
+                    CDM_Extero=abs(CDM_Extero),
+                    NDM_Extero=abs(NDM_Extero))
+    dft=bind_rows(dft,t)
+  }
+  
+  for (ibeta in unique(dft$rowname)){
+    
+    for (imodality in c('Intero','Extero')){
+      df = dft %>% dplyr::filter(rowname==ibeta) %>% dplyr::select(order,contains(imodality),ID)
+      
+      # compute for each of CDM and NDM a t-test against zero (one-sample,two-sided)
+      main.effects.p= df %>%  dplyr::select(-contains('CDMmNDM'),-contains('CDMandNDM')) %>%
+        pivot_longer(cols=contains(imodality),names_to='session',values_to='value') %>%
+        dplyr::group_by(session) %>% dplyr::summarize(p.value.session.mainEffect=t.test(value,mu=0)$p.value) %>%
+        dplyr::mutate(rowname=ibeta,Modality=imodality,type=itype) %>% dplyr::select(session,p.value.session.mainEffect) %>%
+        pivot_wider(.,names_from=session,values_from=p.value.session.mainEffect,names_prefix = 'p.value.session.mainEffect__') %>%
+        # from the column name remove imodality
+        dplyr::rename_all(~str_remove(.,imodality))
+       main.effects.estimate= df %>%  dplyr::select(-contains('CDMmNDM'),-contains('CDMandNDM')) %>%
+        pivot_longer(cols=contains(imodality),names_to='session',values_to='value') %>%
+        dplyr::group_by(session) %>% dplyr::summarize(estimate.session.mainEffect=t.test(value,mu=0)$estimate) %>%
+        dplyr::mutate(rowname=ibeta,Modality=imodality,type=itype) %>% dplyr::select(session,estimate.session.mainEffect) %>%
+        pivot_wider(.,names_from=session,values_from=estimate.session.mainEffect,names_prefix = 'estimate.value.session.mainEffect__') %>%
+        # from the column name remove imodality
+        dplyr::rename_all(~str_remove(.,imodality))
+       main.effects=cbind(main.effects.p,main.effects.estimate)
+       
+      # also combining both groups
+       main.effects.groupsCombined=df %>% dplyr::select(contains('CDMandNDM')) %>%
+        pivot_longer(cols=contains(imodality),names_to='session',values_to='value') %>% #dplyr::group_by(session) 
+        dplyr::summarize(p.value.bothSessions.mainEffect=t.test(value,mu=0)$p.value,
+                         estimate.value.bothSessions.mainEffect=t.test(value,mu=0)$estimate)
+      
+      # Regressions to test the effect of CDM vs NDM, controllinf for order
+      this.lm= lm(formula=paste0(imodality,'_CDMmNDM~ 1+order'),data=df) 
+      stats.summary=as.data.frame(summary(this.lm)$coefficients) %>% rownames_to_column(var='group.level.reg') %>% 
+        # recode group.level.reg (Intercept) with NDM min CDM [!! note 30/5/2025: CDM min NDM, not other wsay round!]
+        dplyr::mutate(group.level.reg=recode(group.level.reg,`(Intercept)`='CDMminNDM')) %>%   #'NDMminCDM')) %>% 
+        pivot_wider(names_from=group.level.reg,values_from=c('Estimate','Std. Error','t value','Pr(>|t|)'),names_sep='__')
+      
+      # new control analysis - Legrand suggestion: control for heartrate mean
+      t= left_join(df,heart.rates.mean.sd %>% dplyr::select(ID,heartRate.mean_cdm_min_ndm),by='ID')
+      this.lm= lm(formula=paste0(imodality,'_CDMmNDM~ 1+order+heartRate.mean_cdm_min_ndm'),data=t) 
+      stats.summary.controlMeanHR=as.data.frame(summary(this.lm)$coefficients) %>% rownames_to_column(var='group.level.reg') %>% 
+        # recode group.level.reg (Intercept) with NDM min CDM
+        dplyr::mutate(group.level.reg=recode(group.level.reg,`(Intercept)`='CDMminNDM')) %>% 
+        dplyr::rename(Estimate.CDMmNDM.ctrHRmean=Estimate, 
+                      `Std. Error.CDMmNDM.ctrHRmean`=`Std. Error`, 
+                      `t value.CDMnNDM.ctrHRmean` = `t value`,
+                      `Pr(>|t|).CDMmNDM.ctrHRmean`=`Pr(>|t|)`)
+      # The same, but for HR SD
+      t= left_join(df,heart.rates.mean.sd %>% dplyr::select(ID,heartRate.sd_cdm_min_ndm),by='ID')
+      this.lm= lm(formula=paste0(imodality,'_CDMmNDM~ 1+order+heartRate.sd_cdm_min_ndm'),data=t) 
+      stats.summary.controlSDHR=as.data.frame(summary(this.lm)$coefficients) %>% rownames_to_column(var='group.level.reg') %>% 
+        # recode group.level.reg (Intercept) with NDM min CDM
+        dplyr::mutate(group.level.reg=recode(group.level.reg,`(Intercept)`='CDMminNDM')) %>% 
+        dplyr::rename(Estimate.CDMmNDM.ctrHRsd=Estimate, 
+                      `Std. Error.CDMmNDM.ctrHRsd`=`Std. Error`, 
+                      `t value.CDMnNDM.ctrHRsd` = `t value`,
+                      `Pr(>|t|).CDMmNDM.ctrHRsd`=`Pr(>|t|)`)
+     
+      # join what we computed above to later print to file
+      this.stats.complete= cbind(main.effects,
+                                 main.effects.groupsCombined,
+                                 stats.summary) %>%
+        dplyr::mutate(Modality=imodality,Subject.level.regression.weight=ibeta,analysis.type=itype,
+                      heartRate.mean_cdm_min_ndm.estimate=stats.summary.controlMeanHR %>% 
+                        dplyr::filter(group.level.reg=="heartRate.mean_cdm_min_ndm") %>% pull(Estimate.CDMmNDM.ctrHRmean),
+                      heartRate.mean_cdm_min_ndm.p = stats.summary.controlMeanHR %>% 
+                        dplyr::filter(group.level.reg=="heartRate.mean_cdm_min_ndm") %>% pull(`Pr(>|t|).CDMmNDM.ctrHRmean`),
+                      CDMmNDM.ctrHRmean.p = stats.summary.controlMeanHR %>% dplyr::filter(group.level.reg=="CDMminNDM") %>% pull(`Pr(>|t|).CDMmNDM.ctrHRmean`),
+                      CDMmNDM.ctrHRmean.estimate = stats.summary.controlMeanHR %>% dplyr::filter(group.level.reg=="CDMminNDM") %>% pull(Estimate.CDMmNDM.ctrHRmean),
+                      
+                      heartRate.sd_cdm_min_ndm.estimate= stats.summary.controlSDHR %>% 
+                        dplyr::filter(group.level.reg=="heartRate.sd_cdm_min_ndm") %>% pull(Estimate.CDMmNDM.ctrHRsd),
+                      heartRate.sd_cdm_min_ndm.p =  stats.summary.controlSDHR %>% 
+                        dplyr::filter(group.level.reg=="heartRate.sd_cdm_min_ndm") %>% pull(`Pr(>|t|).CDMmNDM.ctrHRsd`),
+                      CDMmNDM.ctrHRsd.p =  stats.summary.controlSDHR %>% dplyr::filter(group.level.reg=="CDMminNDM") %>% pull(`Pr(>|t|).CDMmNDM.ctrHRsd`),
+                      CDMmNDM.ctrHRsd.estimate =  stats.summary.controlSDHR %>% dplyr::filter(group.level.reg=="CDMminNDM") %>% pull(Estimate.CDMmNDM.ctrHRsd))
+      session.comparisons=rbind(session.comparisons,this.stats.complete) 
+      
+      
+    }
+  }
+}
+
+write.csv(session.comparisons,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_fitSingleSub.csv'))
+
+```
+# Figures for the paper
+## Decision curves with predictions
+
+We can use the regression weights created above to create a predicted value of % choice for each person for each value (we'll add this to our plot as a line)
+```{r}
+x=seq(-51,51,1)
+predictions=data.frame()
+for (isub in unique(results.indivModalities.notScaled.forPlot$ID)){
+  for (isess in c('NDM','CDM')){
+    for (imod in c('Intero','Extero')){
+      pars = results.indivModalities.notScaled.forPlot %>% dplyr::filter(ID==isub & session==isess & regression=='dec' & Modality==imod) %>% 
+        dplyr::select(rowname,Estimate) %>%pivot_wider(.,values_from=Estimate,names_from=rowname)
+      y = 1/(1+exp(-(pars$`(Intercept)`+x*pars$DV_ResponseMinListen)))
+      predictions=rbind(predictions,
+                        data.frame(DV_ResponseMinListen=x,perc.choice.predicted=y,ID=isub,session=isess,Modality=imod))
+    }
+  }
+}
+
+
+```
+
+For each modality, for each session, plot the choice curves with predicted values (copying again code from above to create binned choices, but plotting with ggplot for more flexibility)
+```{r}
+bins = data.frame(low=quantile(c(min(cardio$DV_ResponseMinListen)-0.5,cardio$DV_ResponseMinListen), probs = seq(0,0.9,0.1)), # to make sure we get the edges with the later rules
+                  high=quantile(c(max(cardio$DV_ResponseMinListen)+0.5,cardio$DV_ResponseMinListen), probs = seq(0.1,1,0.1))) %>%
+  dplyr::mutate(label=(low+high)/2)
+df.real= cardio  %>%
+  dplyr::select(Condition,Modality,Decision,DecisionRT,Confidence,ConfidenceRT,ResponseCorrect,ID,session, DV_ResponseMinListen) %>%
+  fuzzy_left_join(.,bins,by=c('DV_ResponseMinListen'='low','DV_ResponseMinListen'='high'),
+                  match_fun = list(`>=`, `<`)) %>%
+  dplyr::group_by(ID,Modality,label,session) %>% 
+  dplyr::rename(bin=label) %>%
+  dplyr::summarize(perc.choice= sum(Decision=='More')/n()) %>% dplyr::ungroup() 
+df.real.summary= df.real%>% dplyr::group_by(Modality,session,bin) %>%
+  dplyr::summarize(mChoice=mean(perc.choice),perc.choice.sd=sd(perc.choice),n=n(),seChoice=perc.choice.sd/sqrt(n))
+
+dodge_width=0.5
+
+
+df.real.summary.this=df.real.summary %>%dplyr::select(-perc.choice.sd,-n) %>%
+  dplyr::mutate(bin=case_when(session=='NDM' ~ bin+dodge_width,
+                              T ~ bin))
+df.real.this=df.real %>% 
+  dplyr::mutate(bin = case_when(session=='NDM' ~ bin +dodge_width,
+                                T ~ bin),
+                perc.choice=perc.choice+rnorm(n(),mean=0,sd=0.005))
+
+df.predictions=predictions %>% dplyr::group_by(DV_ResponseMinListen,Modality,session) %>%
+  dplyr::summarize(Pred.mean=mean(perc.choice.predicted)) %>%
+  dplyr::mutate(DV_ResponseMinListen=case_when(session=='NDM' ~ DV_ResponseMinListen+dodge_width,
+                                               T ~ DV_ResponseMinListen))
+
+softmax.plot <- ggplot() +
+  theme_bw(base_size = 11) +  # Slightly smaller base font
+  geom_point(data = df.real.this, 
+             aes(x = bin, y = perc.choice, color = session), 
+             size = 1, alpha = 0.15) +
+  geom_errorbar(data = df.real.summary.this, 
+                aes(x = bin, ymin = mChoice - seChoice, ymax = mChoice + seChoice, color = session), 
+                width = 0.08, size = 0.5) +
+  geom_point(data = df.real.summary.this, 
+             aes(x = bin, y = mChoice, color = session, shape = session, fill = session), 
+             size = 3, stroke = 0.5) +
+  geom_line(data = df.predictions, 
+            aes(x = DV_ResponseMinListen, y = Pred.mean, color = session), 
+            size = 0.9) +
+  xlab('Stimulus difference (2nd – 1st, BPM)') +
+  ylab('% Judged 2nd Stimulus Faster') +
+  facet_grid(cols = vars(Modality)) +
+  scale_shape_manual(values = c('CDM' = 21, 'NDM' = 24)) +
+  scale_color_manual(values = c('CDM' = '#E41A1C', 'NDM' = '#377EB8')) +
+  scale_fill_manual(values = c('CDM' = '#E41A1C', 'NDM' = '#377EB8')) +
+  theme(
+    plot.margin = margin(10, 15, 10, 10),  # Tighter top/bottom margin
+    legend.title = element_blank(),
+    legend.position = "top",
+    strip.background = element_rect(fill = "grey90", color = NA),
+    strip.text = element_text(face = "bold", size = 10, margin = margin(2, 0, 2, 0)),
+    axis.text = element_text(size = 10, margin = margin(1, 1, 1, 1)),
+    axis.title = element_text(size = 11),
+    panel.grid.major = element_line(size = 0.2),
+    panel.grid.minor = element_blank()
+  )
+
+
+
+ggexport(softmax.plot, 
+         filename = file.path(paths$figures, 'Interoception_DecisionCurves_splitBySession.tiff'),
+         width = 7 * 300,  # Width in pixels (7 inches at 300 DPI)
+         height = 4.5 * 300,  # Height in pixels (reduced height)
+         res = 300)  # DPI
+
+
+```
+
+
+
+
+## Regression weights
+For decision: 
+- Intercept
+- absolute intercept
+- decision value
+For confidence:
+- all regression weights (+intercept)
+Each split for the two groups. And split for intero/extero. Tim should add the statistics manually (nothing significant).
+
+```{r}
+
+plots=list()
+df=results.indivModalities %>% dplyr::filter(regression %in% c('dec','conf')) %>% 
+  dplyr::mutate(rowname=recode(rowname,`(Intercept)` = 'Intercept',
+                DV_ResponseMinListen="Stimulus difference",easiness_ResponseMinListen.abs="Stimulus easiness",
+                ResponseCorrect="Correct response",DecisionRT="RT (decision)"))
+
+for (imod in c('Intero','Extero')){
+  for (ireg in c('dec','conf')){
+    df.this=df %>% dplyr::filter(Modality==imod,regression==ireg)
+    if (ireg=='dec'){
+      t= df.this %>% dplyr::filter(rowname=='Intercept') %>%
+        dplyr::mutate(rowname=recode(rowname,Intercept="Intercept.abs"),
+                      Estimate=abs(Estimate))
+      df.this=bind_rows(df.this,t) %>%
+        dplyr::mutate(rowname=factor(rowname,ordered=T,levels=c('Stimulus difference','Intercept.abs','Intercept')))
+    } else if (ireg=='conf'){
+      df.this=df.this %>% dplyr::mutate(rowname=factor(rowname,ordered=T,levels=c('Stimulus easiness','Intercept')))
+    }
+    # add some jitter so that the points don't completely overlap and become more visible
+      jitterVal.abs=0.2
+      df.this=df.this%>%dplyr::mutate(jitterVal=case_when(session=='CDM' ~ -jitterVal.abs,
+                                                          T ~ jitterVal.abs),
+                                      jitterVal=rnorm(nrow(df.this),mean=jitterVal,sd=0.05))
+      summaryData = df.this %>%
+        group_by(rowname, session) %>%
+        summarise(meanEstimate = mean(Estimate)
+                  , jitterVal = mean(jitterVal),
+                  sdEstimate=sd(Estimate),
+                  n=n(),
+                  se = sdEstimate/sqrt(n)) %>%
+        mutate(xmin = as.numeric(rowname)+jitterVal, 
+               xend = as.numeric(rowname)+jitterVal) 
+
+      plots[[paste0(imod,'_',ireg)]]=ggplot(df.this, aes(x=as.numeric(rowname)+jitterVal, y=Estimate, group=ID)) +
+        geom_point(size=1, aes(colour=session), alpha=0.7)+
+        geom_line(size=1, alpha=0.1)+
+        #scale_y_continuous(limits=c(0, 7.5), breaks=seq(0,7,by=1))+ 
+        scale_colour_manual(values=c('CDM'='blue','NDM'='red'))+
+        xlab('Regressor') +
+        ggtitle('')+
+        scale_x_continuous(limits=(c(0.5, 3.5)), breaks = seq(1,length(levels(df.this$rowname)),1)-0.1 , labels = levels(df.this$rowname))+
+        ylab('Regression weights') +
+        guides(colour = guide_legend(override.aes = list(alpha = 1))) +
+        geom_point(data=summaryData,   size=2,aes(x=xmin,y=meanEstimate,color=session,group=NA))+
+        geom_errorbar(data=summaryData,aes(x=xmin,y=meanEstimate,ymin=meanEstimate-se,ymax=meanEstimate+se,color=session,group=NA))+
+        
+        theme_bw()
+      
+  }
+}
+
+figure=ggarrange(plots$Intero_dec,plots$Intero_conf,plots$Extero_dec,plots$Extero_conf,nrow=2,ncol=2,
+          labels=c('A Intero - Decision','B Intero - Confidence','C Extero - Decision','D Extero - Confidence'),
+          common.legend=T,
+          # left align the labels
+          hjust=0)
+
+ggexport(figure,filename=file.path(paths$figures,'Interoception_RegressionWeights.tiff'),
+         width=9*400,height=7*400,res=400)
+
+  
+
+
+```
+
+# Print the results as tables for main text and supplements
+```{r}
+session.comparisons=read.csv(file.path(paths$stats,'Interoception_NDMCDMcomparisons_fitSingleSub.csv'))
+# main text: Intero/Extero, decision/confidence, against zero (CDM and NDM separately), comparing NDM vs CDM (estimate (se.); p-value, BF), order effects
+main=session.comparisons %>% 
+  dplyr::select(Modality,analysis.type,Subject.level.regression.weight,contains('.mainEffect'),
+                Estimate__CDMminNDM,Std..Error__CDMminNDM,Pr...t..__CDMminNDM,Estimate__orderNDM.first,Std..Error__orderNDM.first,Pr...t..__orderNDM.first,
+                CDMmNDM.ctrHRmean.p,CDMmNDM.ctrHRsd.p) %>%  #BF.mean.customSD
+  dplyr::mutate("CDM min NDM, mean(s.e.)"=paste0(round(Estimate__CDMminNDM,digits=2),' (',round(Std..Error__CDMminNDM,digits=1),')'),
+                "CDM min NDM (p)"=case_when(Pr...t..__CDMminNDM<0.01 ~ round(Pr...t..__CDMminNDM,digits=3),    #"NDM vs CDM (p)"
+                                T ~ round(Pr...t..__CDMminNDM,digits=2)),
+                'CDM minNDM, ctr HR mean (p)' = case_when(CDMmNDM.ctrHRmean.p<0.001 ~ '<0.001',
+                                                     CDMmNDM.ctrHRmean.p<0.01 ~ as.character(round(CDMmNDM.ctrHRmean.p,digits=3)),
+                                                     T~ as.character(round(CDMmNDM.ctrHRmean.p,digits=2))),
+                'CDM minNDM, ctr HR sd (p)' = case_when(CDMmNDM.ctrHRsd.p<0.001 ~ '<0.001',
+                                                     CDMmNDM.ctrHRsd.p<0.01 ~ as.character(round(CDMmNDM.ctrHRsd.p,digits=3)),
+                                                     T~ as.character(round(CDMmNDM.ctrHRsd.p,digits=2))),
+                "Order [NDM first], mean(s.e.)" =paste0(round(Estimate__orderNDM.first,digits=2),' (',round(Std..Error__orderNDM.first,digits=1),')'),
+                "Order [NDM first] (p)" = case_when(Pr...t..__orderNDM.first<0.01 ~ round(Pr...t..__orderNDM.first,digits=3),
+                                T ~ round(Pr...t..__orderNDM.first,digits=2)),
+                p.value.session.mainEffect__CDM_= case_when(p.value.session.mainEffect__CDM_<0.001 ~ '<0.001',
+                                                            p.value.session.mainEffect__CDM_<0.01 ~ as.character(round(p.value.session.mainEffect__CDM_,digits=3)),
+                                                            T~ as.character(round(p.value.session.mainEffect__CDM_,digits=2))),
+                p.value.session.mainEffect__NDM_= case_when(p.value.session.mainEffect__NDM_ < 0.001 ~ '<0.001',
+                                                            p.value.session.mainEffect__NDM_<0.01 ~ as.character(round(p.value.session.mainEffect__NDM_,digits=3)),
+                                                            T~ as.character(round(p.value.session.mainEffect__NDM_,digits=2))),
+                p.value.bothSessions.mainEffect= case_when(p.value.bothSessions.mainEffect<0.001~'<0.001',
+                                                           p.value.bothSessions.mainEffect<0.01 ~ as.character(round(p.value.bothSessions.mainEffect,digits=3)),
+                                                           T ~  as.character(round(p.value.bothSessions.mainEffect,digits=2))),
+                estimate.value.bothSessions.mainEffect  = round(estimate.value.bothSessions.mainEffect,2),
+                estimate.value.session.mainEffect__CDM_ = round(estimate.value.session.mainEffect__CDM_,2),
+                estimate.value.session.mainEffect__NDM_ = round(estimate.value.session.mainEffect__NDM_,2)) %>%
+  dplyr::rename("CDM (p, one-sample)"=p.value.session.mainEffect__CDM_,
+                "NDM (p, one-sample)"=p.value.session.mainEffect__NDM_,
+                'CDM&NDM (p,one-sample)'=p.value.bothSessions.mainEffect,
+                'CDM&NDM (estimate)'=estimate.value.bothSessions.mainEffect,
+                'CDM (estimate)' = estimate.value.session.mainEffect__CDM_,
+                'NDM (estimate)' = estimate.value.session.mainEffect__NDM_)%>%
+  dplyr::select(-contains('Pr...'),-contains('Estimate__'),-contains('Std..Error'),-contains('p.value.session.main'),-contains('ctrHR')) %>% #,-BF.mean.customSD) %>%
+  # sort the data frame frist by Modality, then by analysis.type, then by Subject.level.regression.weight
+  dplyr::arrange(desc(Modality)) %>%
+  dplyr::mutate(Subject.level.regression.weight=case_when(Modality=='Intero' ~ recode(Subject.level.regression.weight,
+                                                       DV_ResponseMinListen="Stimulus difference (Sound-Heart)",
+                                                       easiness_ResponseMinListen.abs="Stimulus easiness",
+                                                       ResponseCorrect="Correct response",
+                                                       DecisionRT="RT (decision)",
+                                                       listen.responseBPM.mean="Sound+Heart",
+                                                       Intercept.abs='Absolute of intercept',
+                                                       listenBPM='Heart (bpm)',
+                                                       responseBPM = 'Sound (bpm)',
+                                                       listen_minus_responseBPM_beta='Regr. weight diff (Sound minus Heart)'),
+                                                     Modality=='Extero' ~ recode(Subject.level.regression.weight,
+                                                       DV_ResponseMinListen="Stimulus difference (Sound2-Sound1)",
+                                                       easiness_ResponseMinListen.abs="Stimulus easiness",
+                                                       ResponseCorrect="Correct response",
+                                                       DecisionRT="RT (decision)",
+                                                       listen.responseBPM.mean="Sound1+Sound2",
+                                                       Intercept.abs='Absolute of intercept',
+                                                       listenBPM='Sound 1 (bpm)',
+                                                       responseBPM = 'Sound 2 (bpm)',
+                                                       listen_minus_responseBPM_beta='Regr. weight diff (Sound 2 minus Sound 1)')))%>%
+  dplyr::relocate(Modality,analysis.type,Subject.level.regression.weight,`CDM&NDM (p,one-sample)`,`CDM min NDM, mean(s.e.)`,`CDM min NDM (p)`,`Order [NDM first], mean(s.e.)`,`Order [NDM first] (p)`,`CDM (estimate)`,`NDM (estimate)`)  
+
+  
+  
+  
+t=main %>% dplyr::select(-contains('one-sample'))
+write.csv(main,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_mainText.csv'))
+
+main.table1= main %>% dplyr::filter(analysis.type %in% c('dec','conf')) %>% 
+  dplyr::select(-c(`CDM&NDM (p,one-sample)`,`CDM minNDM, ctr HR mean (p)`,`CDM minNDM, ctr HR sd (p)`, `CDM (estimate)`,`NDM (estimate)`,`CDM&NDM (estimate)`,`CDM (p, one-sample)`,`NDM (p, one-sample)`))
+
+main.table.control = main %>% dplyr::filter(analysis.type %in% c('dec.withAvgListenResponseBPM','dec.listenRespBPMsep')) %>%
+  dplyr::select(-c(`CDM&NDM (p,one-sample)`,`CDM&NDM (estimate)`,`CDM min NDM, mean(s.e.)`,`Order [NDM first], mean(s.e.)`,`CDM (p, one-sample)`,`NDM (p, one-sample)`)) 
+
+write.csv(main.table1,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_mainText_newTable.csv'))
+write.csv(main.table.control,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_mainText_controlAnalyses.csv'))
+
+
+```
+
+
+
+
+# Control analysis: hierarchical regression
+One surprsing result above was that when including sound and heart rate separately, for interoception there seems to be a CDM vs NDM difference for the sound, but this is not reflected in the exteroception condition, which suggests to me a false postive finding. We'll repeat the regressions as hierarchical.
+
+In conclusion, we'll have the following equations for the task parameters:
+- DV
+- DV + mean(listen+reponseBPM)
+- listenBPM + reponseBPM
+
+For the session measures, we have:
+- (session+session_time) [i.e. session type - CDM or NDM - and session time - session 1 or session 2]
+- (session*session_time)
+- (session*order) [order is a between-subject factor only as each person only has done one order]
+
+Print summary tables.
+- all results from (session+session_time) 
+- for the others: only the rows with interaction terms
+Consider swapping dimensions to put more on the same
+```{r}
+df= cardio %>% dplyr::filter(Modality=='Intero') %>%
+  dplyr::mutate(session_time = case_when(session=='CDM' &order=='CDM.first' ~ 'session1',
+                                         session=='CDM' &order=='NDM.first' ~ 'session2',
+                                         session=='NDM' &order=='CDM.first' ~ 'session2',
+                                         session=='NDM' &order=='NDM.first' ~ 'session1'),
+                Decision.num = case_when(Decision=='More' ~1,
+                                         Decision=='Less' ~ 0)) %>%
+  dplyr::select(ID,Decision,Decision.num,DV_ResponseMinListen,session,session_time,listenBPM,responseBPM,listen.responseBPM.mean,order) %>%ungroup() %>%
+  dplyr::mutate_at(c('DV_ResponseMinListen','listenBPM','responseBPM','listen.responseBPM.mean'),scale)
+
+
+my.prior=c(prior(normal(0,3),class='b')) 
+
+formulas.basic= c('(listenBPM+responseBPM)',
+                  '(DV_ResponseMinListen+listen.responseBPM.mean)',
+                  'DV_ResponseMinListen')
+formulas.conditions = c('*(session+session_time)',
+                        '*(session*session_time)',
+                        '*(session*order)')
+model.count=0;
+for (ibasic in formulas.basic){
+  for (icond in formulas.conditions){
+    model.count=model.count+1
+    this.file=file.path(paths$stats,paste0('Hierarchical_Interoception_model',model.count,'.csv'))
+    this.file.long=file.path(paths$stats,paste0('Hierarchical_Interoception_model',model.count,'_check.txt'))
+    if (!file.exists(this.file)){
+      if (icond=='*(session*order)') {
+        this.formula= paste0('Decision.num ~',ibasic,icond,'+ (',ibasic,'*session|ID)')
+      } else{
+        this.formula= paste0('Decision.num ~',ibasic,icond,'+ (',ibasic,icond,'|ID)')
+      }
+      
+      print(this.formula)
+      fit = brm(this.formula,
+                data=df,family=bernoulli(link='logit'),prior=my.prior)
+      write.csv(as.data.frame(fixef(fit)) %>% dplyr::mutate_if(is.numeric,~round(.,2)),this.file)
+      sink(this.file.long)
+      print(summary(fit))
+      sink()
+    }
+  }
+}
+
+
+# Summarize the results
+full.hier.res=data.frame()
+for (im in 1:model.count){
+  res=read.csv(file.path(paths$stats,paste0('Hierarchical_Interoception_model',im,'.csv')))
+  if (!any(stringr::str_detect(res$X,'sessionNDM:session_timesession2')) &
+      !any(stringr::str_detect(res$X,'sessionNDM:orderNDM.first'))){
+    full.hier.res= rbind(full.hier.res,res)
+    print('should be 1st model')
+  } else{
+    full.hier.res= rbind(full.hier.res,res %>% dplyr::filter(stringr::str_detect(X,':')))
+    print('should be not first')
+  }
+}
+t=full.hier.res %>% dplyr::mutate(X=stringr::str_replace_all(X,'session_timesession2','Time'),
+                                  X=stringr::str_replace_all(X,'sessionNDM','Intervention'),
+                                  X=stringr::str_replace_all(X,'orderNDM.first','Order'),
+                                  X=stringr::str_replace_all(X,'DV_ResponseMinListen','Sound-Heart'),
+                                  X=stringr::str_replace_all(X,'listen.responseBPM.mean','Sound+Heart'),
+                                  X=stringr::str_replace_all(X,'responseBPM','Sound'),
+                                  X=stringr::str_replace_all(X,'listenBPM','Heart'))
+write.csv(t,file=file.path(paths$stats,'Hiearchical_Interoception_allModels.csv'))
+
+
+```
+
+
+# Control analysis: task difficulty over time
+Due to the adaptive staircasing procedure, task difficulty might be different across participants, so this might be problematic for regressions, especially when the data is z-scored within each person! (this is why we did not z-score within each person in the analyses above).
+
+But jsut in case, here we check the value the task converges to. 
+```{r}
+df= cardio %>% dplyr::filter(Modality=='Intero') %>% dplyr::group_by(ID,session,order) %>%
+  dplyr::mutate(ntr = row_number()) %>% 
+  dplyr::filter(ntr>= max(ntr)-4)  %>%
+  dplyr::summarize(mean.DV_ResponseMinListen = mean(DV_ResponseMinListen,na.rm=T)) %>% ungroup() %>%
+  pivot_wider(.,names_from='session',values_from='mean.DV_ResponseMinListen') %>%
+  dplyr::mutate(mean.DV_CDMminNDM = CDM-NDM,
+                mean.DV_CDMminNDM.abs = abs(CDM)-abs(NDM))
+
+
+fit=brm(mean.DV_CDMminNDM.abs~order,data=df)
+fit.lm=lm(mean.DV_CDMminNDM.abs~order,data=df)
+
+fit2=brm(mean.DV_CDMminNDM~order,data=df)
+fit2.lm=lm(mean.DV_CDMminNDM~order,data=df)
+
+#plot.mean.DV_CDMminNDM.abs = gghistogram(df, x='mean.DV_CDMminNDM.abs')
+
+#df2 = dplyr::left_join(df,heart.rates.mean.sd %>% 
+#                         dplyr::select(ID,listenBPM.mean_CDM,listenBPM.mean_NDM,listen))
+sink(file=file.path(paths$stats,'TaskInternal_Threshold_estimation.txt'))
+print('taking the last 5 trials and averaging')
+print(summary(fit.lm))
+print(summary(fit2.lm))
+sink()
+```
+
+
+# Control analysis: comparing the log likelihoods
+We compare:
+- log likelihood summed
+- count better model
+```{r}
+summedLogLiks=results.logLiks %>% group_by(session,Modality) %>%
+  dplyr::summarize(logLik.listenBeep.sum=sum(logLik.listenBeep),
+                   logLik.responseBeepOnly = sum(logLik.responseBeepOnly))
+
+t= results.logLiks %>% dplyr::mutate(neg.loglik.listen_minus_soundOnly = -logLik.listenBeep -(-logLik.responseBeepOnly)) %>%
+  dplyr::mutate(facets=paste0(session,'_',Modality),
+                best.model.listenVsNothing = case_when(logLik.listenBeep > logLik.responseBeepOnly ~ 'logLik.listenBeep',
+                                                       logLik.listenBeep < logLik.responseBeepOnly ~ 'logLik.responseBeepOnly'))
+this.plot=ggscatter(t,x='ID',y='neg.loglik.listen_minus_soundOnly',facet.by = 'facets', ylab='Neg logLik diff [HR minus sound] vs [sound only]') +
+  # add horizontal lines at 0
+  geom_hline(yintercept=0) +
+  rremove('x.text')
+
+ggexport(this.plot,
+         filename=file.path(paths$figures,'neglogLikelihood_heartBeat_minus_soundBeep.tiff'),
+         width = 7 * 300,  # Width in pixels (7 inches at 300 DPI)
+         height = 7 * 300,  # Height in pixels (reduced height)
+         res = 300) 
+
+t.summary.listenVsNothing = t %>% dplyr::group_by(Modality,session,best.model.listenVsNothing) %>% 
+  dplyr::summarize(count.best.model=n())
+
+t.summary.listenVsNothing.bySessionNumber = t %>%
+  dplyr::mutate(sessionNumber= case_when(session=='CDM' & order=='CDM.first' ~ 'session1',
+                                         session=='CDM' & order=='NDM.first' ~ 'session2',
+                                         session=='NDM' & order=='CDM.first' ~ 'session2',
+                                         session=='NDM' & order=='NDM.first' ~ 'session1'))%>%
+  dplyr::group_by(Modality,sessionNumber,best.model.listenVsNothing) %>% 
+  dplyr::summarize(count.best.model=n()) %>% dplyr::arrange(Modality,sessionNumber)
+write.csv(t.summary.listenVsNothing.bySessionNumber,file=file.path(paths$stats,'logLikelihood_listenVsNothing_bySession.csv'))
+write.csv(t.summary.listenVsNothing,file=file.path(paths$stats,'logLikelihood_listenVsNothing.csv'))
+
+```
+
+# Control analysis: analysing the original Legrand data
+```{r}
+# Compute variables
+cardio.legrand.this = cardio.legrand %>% dplyr::group_by(ID,Modality)  %>%
+  dplyr::mutate(DV_ResponseMinListen = responseBPM-listenBPM,
+                Decision = recode(Decision,'More'=1,'Less'=0)) %>% dplyr::ungroup() 
+# run regressions
+results.indivModalities.legrand=data.frame()
+results.logLiks.glms.legrand = data.frame()
+
+for (isub in unique(cardio.legrand.this$ID)){
+  for (imod in unique(cardio.legrand.this$Modality)){
+    df= cardio.legrand.this %>% dplyr::filter( Modality==imod & ID==isub)
+    
+    glms=list()
+    glms$dec = glm(Decision~ DV_ResponseMinListen,data=df,family='binomial')
+    # Control analyses
+    glms$dec.listenRespBPMsep = glm(Decision~ listenBPM+responseBPM,data=df,family='binomial')
+    df.comparison= df %>% dplyr::select(Decision,DV_ResponseMinListen,responseBPM) %>% na.omit()
+    glms$forLogLik.listenBeep = glm(Decision ~ DV_ResponseMinListen,data=df.comparison,family='binomial')
+    glms$forLogLik.responseBeepOnly = glm(Decision ~ responseBPM,data=df.comparison,family='binomial')
+    
+    results.logLiks.glms.legrand=bind_rows(results.logLiks.glms.legrand,
+                                           data.frame(ID=isub,Modality=imod,
+                                                      #logLik.avgBeep5tr=logLik(glms$forLogLik.avgBeep5tr),
+                                                      logLik.listenBeep=logLik(glms$forLogLik.listenBeep),
+                                                      logLik.responseBeepOnly = logLik( glms$forLogLik.responseBeepOnly),
+                                                      nobs.listenBeep = nobs(glms$forLogLik.listenBeep),
+                                                      nobs.responseBeepOnly = nobs(glms$forLogLik.responseBeepOnly)))
+    
+    for (ireg in names(glms)){
+        t=as.data.frame(summary(glms[[ireg]])$coefficients) %>% tibble::rownames_to_column() %>%
+          dplyr::mutate(ID=isub,Modality=imod,regression=ireg)
+        results.indivModalities.legrand=bind_rows(results.indivModalities.legrand,t)
+      }
+  }
+}
+
+```
+
+Check the log likelihoods like in legrand data (less negative = better)
+```{r}
+
+
+summedLogLiks.legrand=results.logLiks.glms.legrand %>% group_by(Modality) %>%
+  dplyr::summarize(#logLik.avgBeep5tr.sum=sum(logLik.avgBeep5tr),
+                   logLik.listenBeep.sum=sum(logLik.listenBeep),
+                   logLik.responseBeepOnly = sum(logLik.responseBeepOnly))
+
+t.legrand= results.logLiks.glms.legrand  %>%
+  dplyr::mutate(best.model.listenVsNothing = case_when(logLik.listenBeep > logLik.responseBeepOnly ~ 'logLik.listenBeep',
+                                                       logLik.listenBeep < logLik.responseBeepOnly ~ 'logLik.responseBeepOnly'),
+                neg.logLik.listenBeep.divnObs=-logLik.listenBeep/nobs.listenBeep,
+                neg.logLik.responseBeepOnly.divnObs = -logLik.responseBeepOnly/nobs.listenBeep,
+                neg.logLik.listen_minus_soundOnly = -logLik.listenBeep -(-logLik.responseBeepOnly)) %>%
+  left_join(.,cardio.legrand %>% group_by(ID,Modality) %>% 
+              dplyr::summarize(listenBPM.mean=mean(listenBPM),
+                               listenBPM.sd  = sd(listenBPM)) , by=c('ID','Modality'))
+
+
+#Is there a relationship between the log likelihood advantage and the standard deviation of heart rate?
+tab_corr(t.legrand %>% dplyr::filter(Modality=='Intero') %>% dplyr::select(neg.logLik.listen_minus_soundOnly,neg.logLik.listenBeep.divnObs, neg.logLik.responseBeepOnly.divnObs, listenBPM.mean,listenBPM.sd))
+
+
+
+plots.legrand=list()  
+# plots of the correlations between SD heart rate and the log likelihoods
+plots.legrand$cor.HRsd_logLikDiffListenVsSoundOnly = ggscatter(t.legrand %>% dplyr::filter(Modality=='Intero'),
+                                                               y='neg.logLik.listen_minus_soundOnly',x='listenBPM.sd', 
+                                                               add='reg.line', cor.coef=T,
+                                                                ylab='Neg logLik diff [HR min sound] vs [sound only]',
+                                                               xlab='Heart rate SD') +
+  theme(plot.margin = margin(20,0,0,0))
+plots.legrand$cor.HRsd_neglogLik.listenBeep = ggscatter(t.legrand %>% dplyr::filter(Modality=='Intero'),
+                                                        y='neg.logLik.listenBeep.divnObs',x='listenBPM.sd', add='reg.line', cor.coef=T,
+                                                         ylab='Neg logLik (mean) HR minus sound',
+                                                               xlab='Heart rate SD', ylim=c(0,1.1),cor.coef.coord=c(2.5,1))+
+  theme(plot.margin = margin(20,0,0,0))
+plots.legrand$cor.HRsd_neglogLik.responseBeepOnly= ggscatter(t.legrand %>% dplyr::filter(Modality=='Intero'),
+                                                             y='neg.logLik.responseBeepOnly.divnObs',x='listenBPM.sd',
+                                                             add='reg.line', cor.coef=T,
+                                                             ylab='Neg logLik (mean) sound only',
+                                                               xlab='Heart rate SD', ylim=c(0,1.1),cor.coef.coord=c(2.5,1))+
+  theme(plot.margin = margin(20,0,0,0))
+
+
+plots.legrand$neg.loglik.listen_minus_soundOnly=ggscatter(t.legrand,x='ID',y='neg.logLik.listen_minus_soundOnly',size=1,
+                                                          facet.by = 'Modality',nrow=2,
+                                                          ylab='Neg logLik diff [HR minus sound] vs [sound only]') +
+  # add horizontal lines at 0
+  geom_hline(yintercept=0)+
+  rremove('x.text')+theme(plot.margin = margin(20,0,0,0))
+
+ggexport(plots.legrand,file=file.path(paths$figures,'Legrand_neglogLikelihoods.pdf'))
+this.fig = ggarrange(plots.legrand$neg.loglik.listen_minus_soundOnly,
+                     ggarrange(plots.legrand$cor.HRsd_logLikDiffListenVsSoundOnly,plots.legrand$cor.HRsd_neglogLik.listenBeep,plots.legrand$cor.HRsd_neglogLik.responseBeepOnly, nrow=1),nrow=2,labels=c('A','B'))
+ggexport(this.fig,
+         filename=file.path(paths$figures,'Legrand_neglogLikelihood_heartBeat_minus_soundBeep_corrs.tiff'),
+         width = 12 * 300,  # Width in pixels (7 inches at 300 DPI)
+         height = 8 * 300,  # Height in pixels (reduced height)
+         res = 300) 
+
+t.summary.legrand.listenVsNothing = t.legrand %>% dplyr::group_by(Modality,best.model.listenVsNothing) %>% 
+  dplyr::summarize(count.best.model=n())
+write.csv(t.summary.legrand.listenVsNothing,file=file.path(paths$stats,'Legrand_likelihoods_listenVsNothing.csv'))
+
+
+```
+
+Group level regression weights - stats and plots
+```{r}
+t=results.indivModalities.legrand %>% dplyr::group_by(rowname,Modality,regression) %>%
+  dplyr::summarize(p.value=t.test(Estimate,mu=0)$p.value,
+                   p.wilcox= wilcox.test(Estimate,mu=0)$p.value,
+                   estimate=t.test(Estimate,mu=0)$estimate)%>%
+  dplyr::arrange(regression,Modality,rowname)
+write.csv(t,file=file.path(paths$stats,'Legrand_regression_weights_stats.csv'))
+
+plots=list()
+df=results.indivModalities.legrand %>% dplyr::filter(regression %in% c('dec.listenRespBPMsep')) %>% 
+  dplyr::mutate(rowname=case_when(Modality=='Extero' ~ recode(rowname,`(Intercept)` = 'Intercept',listenBPM='1st sound',responseBPM = '2nd sound'),
+                                  Modality=='Intero' ~ recode(rowname,`(Intercept)` = 'Intercept',listenBPM='Heartrate',responseBPM = 'Sound')))
+                                                              
+                               
+             
+for (imod in c('Intero','Extero')){
+  df.this=df %>% dplyr::filter(regression=='dec.listenRespBPMsep' & Modality==imod) %>%
+    dplyr::filter(rowname!='Intercept') 
+ summaryData = df.this %>%
+    group_by(rowname) %>%  #, session) %>%
+    summarise(meanEstimate = mean(Estimate),
+              sdEstimate=sd(Estimate),
+              n=n(),
+              se = sdEstimate/sqrt(n)) #%>%
+ 
+  plots[[imod]]=ggplot(df.this, aes(x=rowname, y=Estimate)) + #,color='Modality')) + #, group=ID)) +
+    geom_jitter(size=1, aes(), alpha=0.7,color='grey',position='jitter')+
+    xlab('Regressor') +
+    ggtitle('')+
+    ylab('Impact on choice 2nd vs 1st stimulus') +
+    guides(colour = guide_legend(override.aes = list(alpha = 1))) +
+    geom_point(data=summaryData,   size=2,aes(x=rowname,y=meanEstimate,group=NA))+ #color=session,
+    geom_errorbar(data=summaryData,aes(x=rowname,y=meanEstimate,ymin=meanEstimate-se,ymax=meanEstimate+se,group=NA))+ #color=session
+    theme_bw()+
+    ylim(-2,2.5)
+  
+}
+
+# Arrange the 2 plots
+figure=ggarrange(plots$Intero,plots$Extero,nrow=1,ncol=2,
+          labels=c('A Intero','B Extero '),
+          common.legend=T,
+          # left align the labels
+          hjust=0)
+
+ggexport(figure,filename=file.path(paths$figures,'Legrand_RegressionWeights.tiff'),
+         width=9*400,height=4*400,res=400)
+
+
+
+
+```
+
+
