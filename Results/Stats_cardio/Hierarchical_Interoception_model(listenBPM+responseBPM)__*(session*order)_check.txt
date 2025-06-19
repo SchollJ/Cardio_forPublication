@@ -1,0 +1,50 @@
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: Decision.num ~ (listenBPM + responseBPM) * (session * order) + ((listenBPM + responseBPM) * session | ID) 
+   Data: df (Number of observations: 2344) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Multilevel Hyperparameters:
+~ID (Number of levels: 24) 
+                                                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                                        1.89      0.40     1.22     2.75 1.00     1253     1974
+sd(listenBPM)                                        0.47      0.27     0.04     1.03 1.00      827     1253
+sd(responseBPM)                                      1.28      0.27     0.84     1.89 1.00     1795     2683
+sd(sessionNDM)                                       1.03      0.36     0.32     1.77 1.01      814      783
+sd(listenBPM:sessionNDM)                             0.82      0.46     0.04     1.80 1.01      486      763
+sd(responseBPM:sessionNDM)                           0.51      0.30     0.03     1.15 1.00     1306     1442
+cor(Intercept,listenBPM)                             0.04      0.33    -0.60     0.67 1.00     3918     2597
+cor(Intercept,responseBPM)                           0.05      0.22    -0.37     0.45 1.00     1821     2330
+cor(listenBPM,responseBPM)                          -0.26      0.32    -0.79     0.44 1.01      447      696
+cor(Intercept,sessionNDM)                            0.06      0.29    -0.50     0.65 1.00     2200     2247
+cor(listenBPM,sessionNDM)                           -0.12      0.37    -0.77     0.59 1.01      664     1462
+cor(responseBPM,sessionNDM)                          0.30      0.27    -0.27     0.76 1.00     2309     2753
+cor(Intercept,listenBPM:sessionNDM)                 -0.04      0.31    -0.62     0.58 1.00     2618     2310
+cor(listenBPM,listenBPM:sessionNDM)                 -0.15      0.36    -0.78     0.60 1.00     1003     1686
+cor(responseBPM,listenBPM:sessionNDM)               -0.15      0.31    -0.71     0.47 1.00     2595     2409
+cor(sessionNDM,listenBPM:sessionNDM)                -0.13      0.33    -0.72     0.54 1.00     1697     2933
+cor(Intercept,responseBPM:sessionNDM)                0.29      0.31    -0.38     0.81 1.00     2660     2192
+cor(listenBPM,responseBPM:sessionNDM)               -0.02      0.36    -0.69     0.67 1.00     2809     3114
+cor(responseBPM,responseBPM:sessionNDM)             -0.12      0.34    -0.71     0.58 1.00     3768     3326
+cor(sessionNDM,responseBPM:sessionNDM)              -0.06      0.35    -0.69     0.64 1.00     2694     2993
+cor(listenBPM:sessionNDM,responseBPM:sessionNDM)    -0.04      0.37    -0.71     0.66 1.00     2673     3206
+
+Regression Coefficients:
+                                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept                                -0.35      0.55    -1.40     0.75 1.01      994     1755
+listenBPM                                 0.06      0.31    -0.55     0.66 1.00     1834     2378
+responseBPM                               3.30      0.42     2.50     4.14 1.00     1661     2147
+sessionNDM                                0.12      0.40    -0.65     0.92 1.00     1986     2359
+orderNDM.first                            1.00      0.80    -0.51     2.64 1.00     1056     1633
+sessionNDM:orderNDM.first                 0.35      0.58    -0.78     1.49 1.00     1707     2277
+listenBPM:sessionNDM                     -0.01      0.41    -0.79     0.84 1.00     2043     2041
+listenBPM:orderNDM.first                  0.06      0.47    -0.82     0.99 1.00     2054     2476
+responseBPM:sessionNDM                    0.35      0.36    -0.35     1.09 1.00     2442     2832
+responseBPM:orderNDM.first               -0.33      0.59    -1.50     0.85 1.00     1502     1949
+listenBPM:sessionNDM:orderNDM.first      -0.22      0.63    -1.53     0.94 1.00     1885     1992
+responseBPM:sessionNDM:orderNDM.first    -0.61      0.47    -1.55     0.26 1.00     2456     2642
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).

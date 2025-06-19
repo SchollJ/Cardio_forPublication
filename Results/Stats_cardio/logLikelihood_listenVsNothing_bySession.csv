@@ -1,9 +1,9 @@
 "","Modality","sessionNumber","best.model.listenVsNothing","count.best.model"
-"1","Extero","session1","logLik.listenBeep",20
-"2","Extero","session1","logLik.responseBeepOnly",4
+"1","Extero","session1","logLik.listenBeep",21
+"2","Extero","session1","logLik.responseBeepOnly",3
 "3","Extero","session2","logLik.listenBeep",22
 "4","Extero","session2","logLik.responseBeepOnly",2
-"5","Intero","session1","logLik.listenBeep",9
-"6","Intero","session1","logLik.responseBeepOnly",15
-"7","Intero","session2","logLik.listenBeep",3
-"8","Intero","session2","logLik.responseBeepOnly",21
+"5","Intero","session1","logLik.listenBeep",6
+"6","Intero","session1","logLik.responseBeepOnly",18
+"7","Intero","session2","logLik.listenBeep",5
+"8","Intero","session2","logLik.responseBeepOnly",19

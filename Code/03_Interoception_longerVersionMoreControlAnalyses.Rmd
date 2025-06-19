@@ -40,8 +40,8 @@ From the paper:
 In the code from the original paper, they're R files are in docs>source>examples>R
 ```{r}
 rm(list=ls())
-paths=list(base.path='/Users/JScholl/Documents/Collaborations/Tim_Palmer/Cardio_paper/Cardio_publication')
-#paths=list(base.path='/Users/jacquelinescholl/Documents/Experiments/Tim_Palmer/FMRI_study/Cardio_publication')
+#paths=list(base.path='/Users/JScholl/Documents/Collaborations/Tim_Palmer/Cardio_paper/Cardio_publication')
+paths=list(base.path='/Users/jacquelinescholl/Documents/Experiments/Tim_Palmer/Cardio_forPublication')
 #paths=list(base.path='C:/Users/tpalmer4/OneDrive - University of Plymouth/Meditation/Lyon/Survey and Cardioception Paper/Cardio_publication/Cardio_publication')
 paths$figures=file.path(paths$base.path,'Results','Figures_cardio')
 paths$stats=file.path(paths$base.path,'Results','Stats_cardio')
@@ -87,7 +87,10 @@ cardio.unfiltered = left_join(cardio.unfiltered,med.data,by='ID') %>% # checked,
                 rollingResponseAvg.prev= lag(rollingResponseAvg),
                 rollingResponseAvg.5tr=rollapply(responseBPM,5,mean,align='right',fill=NA),
                 rollingResponseAvg.5tr.prev= lag(rollingResponseAvg.5tr),
-                DV_ResponseMinAvg5tr = responseBPM-rollingResponseAvg.5tr.prev) %>% # to use in model: previous as the other one includes the current trial
+                DV_ResponseMinAvg5tr = responseBPM-rollingResponseAvg.5tr.prev,
+                rollingHeartAvg.5tr=rollapply(listenBPM,5,mean,align='right',fill=NA),# to use in model: previous as the other one includes the current trial
+                #rollingHeartAvg.5tr.prev= lag(rollingHeartAvg.5tr),
+                DV_ResponseMinAvgListen5tr=responseBPM-rollingHeartAvg.5tr) %>%  # for heart:better to include currentTrial
   dplyr::ungroup()
 
 t=cardio.unfiltered%>% dplyr::filter(Modality=='Intero') %>% dplyr::select(ID,session,Modality,listenBPM,responseBPM,rollingResponseAvg,rollingResponseAvg.prev) 
@@ -121,7 +124,8 @@ t= cardio %>%dplyr::filter(Modality=='Intero')%>% group_by(session,ID,order) %>%
 folders=list.files(file.path(paths$base.path,'Data','CardioceptionPaper-main','data','raw','HRD'),full.names = T)
 cardio.legrand.unfiltered= data.frame()
 for (ifold in folders){
-  ID=stringr::str_split(ifold,'/')[[1]][14]
+  t=stringr::str_split(ifold,'/')#
+  ID=t[[1]][length(t[[1]])]
   cardio.legrand.unfiltered=rbind(cardio.legrand.unfiltered,
                                   read.csv(file.path(ifold,'filtered.txt')) %>% dplyr::mutate(ID=ID))
 }
@@ -320,13 +324,14 @@ results.logLiks = data.frame()
 cardio.scaled=cardio %>% dplyr::ungroup() %>%
   
   dplyr::mutate_at(vars(c('DV_ResponseMinListen','easiness_ResponseMinListen.abs','DecisionRT','Confidence',
-                          'listenBPM','listen.responseBPM.mean','responseBPM','rollingResponseAvg.prev','rollingResponseAvg.5tr.prev','DV_ResponseMinAvg5tr')),scale)
+                          'listenBPM','listen.responseBPM.mean','responseBPM','rollingResponseAvg.prev','rollingResponseAvg.5tr.prev','DV_ResponseMinAvg5tr',
+                          'rollingHeartAvg.5tr','DV_ResponseMinAvgListen5tr')),scale)
 for (isub in unique(cardio$ID)){
   dft=cardio.scaled %>% dplyr::filter(ID==isub) %>%
-    dplyr::mutate(Decision = recode(Decision,'More'=1,'Less'=0),
-                  ResponseCorrect = recode(ResponseCorrect,'True'=1,'False'=0))
+    dplyr::mutate(Decision = dplyr::recode(Decision,'More'=1,'Less'=0),
+                  ResponseCorrect = dplyr::recode(ResponseCorrect,'True'=1,'False'=0))
   dft.nonScaled=cardio %>% dplyr::ungroup() %>% dplyr::filter(ID==isub) %>%
-    dplyr::mutate(Decision = recode(Decision,'More'=1,'Less'=0))
+    dplyr::mutate(Decision = dplyr::recode(Decision,'More'=1,'Less'=0))
   for (isess in unique(dft$session)){
     for (imod in unique(dft$Modality)){
       #print(paste(isub,isess,imod)) #s07 NDM Extero"
@@ -345,18 +350,21 @@ for (isub in unique(cardio$ID)){
       glms$dec.zscoredWithin = glm(Decision~ DV_ResponseMinListen,data=df.zscoredWithinSub,family='binomial')
       glms$avgBeep.separate =  glm(Decision~listenBPM+rollingResponseAvg.prev+responseBPM,data=df.nonScaled,family='binomial')
       glms$avgBeep5tr.separate = glm(Decision~listenBPM+rollingResponseAvg.5tr.prev+responseBPM,data=df.nonScaled,family='binomial')
+      glms$avgHeartRate5tr.separate = glm(Decision~rollingHeartAvg.5tr+responseBPM,data=df.nonScaled,family='binomial')
       # comparison: with avg vs with listen
-      df.comparison= df.nonScaled %>% dplyr::select(Decision,DV_ResponseMinAvg5tr,DV_ResponseMinListen,responseBPM) %>% na.omit()
+      df.comparison= df.nonScaled %>% dplyr::select(Decision,DV_ResponseMinAvg5tr,DV_ResponseMinListen,responseBPM,DV_ResponseMinAvgListen5tr) %>% na.omit()
     
       glms$forLogLik.avgBeep5tr = glm(Decision ~ DV_ResponseMinAvg5tr,data=df.comparison,family='binomial')
       glms$forLogLik.listenBeep = glm(Decision ~ DV_ResponseMinListen,data=df.comparison,family='binomial')
       glms$forLogLik.responseBeepOnly = glm(Decision ~ responseBPM,data=df.comparison,family='binomial')
+      glms$forLogLik.avgHeart5tr = glm(Decision ~ DV_ResponseMinAvgListen5tr,data=df.comparison,family='binomial')
       
       results.logLiks=bind_rows(results.logLiks,
                                 data.frame(ID=isub,session=isess,Modality=imod,order=df.nonScaled$order[1],
                                            logLik.avgBeep5tr=logLik(glms$forLogLik.avgBeep5tr),
                                            logLik.listenBeep=logLik(glms$forLogLik.listenBeep),
-                                           logLik.responseBeepOnly = logLik( glms$forLogLik.responseBeepOnly)))
+                                           logLik.responseBeepOnly = logLik( glms$forLogLik.responseBeepOnly),
+                                           logLik.responesBeepAvg5trlisten = logLik(glms$forLogLik.avgHeart5tr)))
      # glms$acc = glm(ResponseCorrect~ easiness_ResponseMinListen.abs,data=df,family='binomial')
      # glms$conf= lm(Confidence ~ easiness_ResponseMinListen.abs+ResponseCorrect+DecisionRT,data=df)
       glms$conf= lm(Confidence ~ easiness_ResponseMinListen.abs,data=df)
@@ -367,7 +375,7 @@ for (isub in unique(cardio$ID)){
       }
       # For the plot also without scaling
       df.notscaled= cardio %>%  dplyr::filter(ID==isub & session==isess & Modality==imod) %>%
-        dplyr::mutate(Decision = recode(Decision,'More'=1,'Less'=0))
+        dplyr::mutate(Decision = dplyr::recode(Decision,'More'=1,'Less'=0))
       glms.dec.notScaled=list()
       glms.dec.notScaled$dec= glm(Decision~DV_ResponseMinListen,data=df.notscaled,family='binomial')
       glms.dec.notScaled$dec.listenRespBPMsep = glm(Decision~ listenBPM+responseBPM,data=df,family='binomial')
@@ -396,7 +404,7 @@ for (isub in unique(cardio$ID)){
   }
 }
 
-results.indivModalities=results.indivModalities %>% dplyr::mutate(rowname=recode(rowname,`(Intercept)` = 'Intercept')) %>%
+results.indivModalities=results.indivModalities %>% dplyr::mutate(rowname=dplyr::recode(rowname,`(Intercept)` = 'Intercept')) %>%
   left_join(.,med.data,by='ID')
 write.csv(results.indivModalities,file=file.path(paths$base.path,'Data_preprocessed','Interoception_Regression_withinSubjRegression.csv'))
 t= results.indivModalities %>% dplyr::filter(regression=='dec') %>% dplyr::select(-`Std. Error`,-`z value`,-`t value`,-`Pr(>|t|)`) %>%
@@ -408,7 +416,7 @@ write.csv(t %>% dplyr::filter(rowname=="Intercept")%>%
             dplyr::mutate(Intero_absCDM_m_absNDM=abs(CDM_Intero)-abs(NDM_Intero)),
           file=file.path(paths$stats,'Interoception_Regression_withinSubjRegressio_dec_absIntercept.csv'))
 
-results.allModalities  =results.allModalities %>% dplyr::mutate(rowname=recode(rowname,`(Intercept)` = 'Intercept'))%>%
+results.allModalities  =results.allModalities %>% dplyr::mutate(rowname=dplyr::recode(rowname,`(Intercept)` = 'Intercept'))%>%
   left_join(.,med.data,by='ID')
 ```
 
@@ -463,7 +471,7 @@ for (itype in unique(results.indivModalities$regression)){ #c('conf','dec','dec.
   # when itype is dec, let's also test the absolute
   if (stringr::str_detect(itype,'dec')){ #(itype=='dec'|itype=='dec.withListenBPM'){
     t= dft %>% dplyr::filter(rowname=='Intercept') %>%
-      dplyr::mutate(rowname=recode(rowname,Intercept="Intercept.abs"),
+      dplyr::mutate(rowname=dplyr::recode(rowname,Intercept="Intercept.abs"),
                     Intero_CDMmNDM=abs(CDM_Intero)-abs(NDM_Intero),
                     Extero_CDMmNDM=abs(CDM_Extero)-abs(NDM_Extero),
                     Extero_CDMandNDM = (abs(CDM_Extero)+abs(NDM_Extero))/2,
@@ -507,7 +515,7 @@ for (itype in unique(results.indivModalities$regression)){ #c('conf','dec','dec.
       this.lm= lm(formula=paste0(imodality,'_CDMmNDM~ 1+order'),data=df) 
       stats.summary=as.data.frame(summary(this.lm)$coefficients) %>% rownames_to_column(var='group.level.reg') %>% 
         # recode group.level.reg (Intercept) with NDM min CDM [!! note 30/5/2025: CDM min NDM, not other wsay round!]
-        dplyr::mutate(group.level.reg=recode(group.level.reg,`(Intercept)`='CDMminNDM')) %>%   #'NDMminCDM')) %>% 
+        dplyr::mutate(group.level.reg=dplyr::recode(group.level.reg,`(Intercept)`='CDMminNDM')) %>%   #'NDMminCDM')) %>% 
         pivot_wider(names_from=group.level.reg,values_from=c('Estimate','Std. Error','t value','Pr(>|t|)'),names_sep='__')
       
 
@@ -519,7 +527,7 @@ for (itype in unique(results.indivModalities$regression)){ #c('conf','dec','dec.
       this.lm= lm(formula=paste0(imodality,'_CDMmNDM~ 1'),data=df) 
       stats.summary.notControlOrder=as.data.frame(summary(this.lm)$coefficients) %>% rownames_to_column(var='group.level.reg') %>% 
         # recode group.level.reg (Intercept) with NDM min CDM
-        dplyr::mutate(group.level.reg=recode(group.level.reg,`(Intercept)`='CDMminNDM')) %>% #'NDMminCDM')) %>% 
+        dplyr::mutate(group.level.reg=dplyr::recode(group.level.reg,`(Intercept)`='CDMminNDM')) %>% #'NDMminCDM')) %>% 
         dplyr::rename(Estimate.CDMmNDM.notControlOrder=Estimate, #dplyr::rename(Estimate.NDMmCDM.notControlOrder=Estimate,
                       `Std. Error.CDMmNDM.notControlOrder`=`Std. Error`, #`Std. Error.NDMmCDM.notControlOrder`=`Std. Error`,
                       `Pr(>|t|).CDMmNDM.notControlOrder`=`Pr(>|t|)`) #`Pr(>|t|).NDMmCDM.notControlOrder`=`Pr(>|t|)`)
@@ -529,7 +537,7 @@ for (itype in unique(results.indivModalities$regression)){ #c('conf','dec','dec.
       this.lm= lm(formula=paste0(imodality,'_CDMmNDM~ 1+order+heartRate.mean_cdm_min_ndm'),data=t) 
       stats.summary.controlMeanHR=as.data.frame(summary(this.lm)$coefficients) %>% rownames_to_column(var='group.level.reg') %>% 
         # recode group.level.reg (Intercept) with NDM min CDM
-        dplyr::mutate(group.level.reg=recode(group.level.reg,`(Intercept)`='CDMminNDM')) %>% 
+        dplyr::mutate(group.level.reg=dplyr::recode(group.level.reg,`(Intercept)`='CDMminNDM')) %>% 
         dplyr::rename(Estimate.CDMmNDM.ctrHR=Estimate, 
                       `Std. Error.CDMmNDM.ctrHR`=`Std. Error`, 
                       `t value.CDMnNDM.ctrHR` = `t value`,
@@ -820,7 +828,7 @@ So the figure would be:
 # Create a figure with the regression weights from the data frame results.indivModalities. In the figure, there are 4 separate subplots, for each combination of Modality (Extero or Intero) and regression (dec or conf, ignoring acc). In each subplot, we want to show all regression weights (in the column 'rowname'), separately for each session (CDM or NDM). The regression weights should be plotted as mean and standard deviations. The figure should be saved as a pdf file in the folder paths$figures, with the name Interoception_RegressionWeights.pdf. The figure should have a title, and the x-axis should be labeled 'Regression weight'. The y-axis should be labeled 'Regression weight'. The x-axis should be rotated by 45 degrees. The colors should be the same as in the previous figure. 
 plots=list()
 df=results.indivModalities %>% dplyr::filter(regression %in% c('dec','conf')) %>% 
-  dplyr::mutate(rowname=recode(rowname,`(Intercept)` = 'Intercept',
+  dplyr::mutate(rowname=dplyr::recode(rowname,`(Intercept)` = 'Intercept',
                 DV_ResponseMinListen="Stimulus difference",easiness_ResponseMinListen.abs="Stimulus easiness",
                 ResponseCorrect="Correct response",DecisionRT="RT (decision)"))
 
@@ -829,7 +837,7 @@ for (imod in c('Intero','Extero')){
     df.this=df %>% dplyr::filter(Modality==imod,regression==ireg)
     if (ireg=='dec'){
       t= df.this %>% dplyr::filter(rowname=='Intercept') %>%
-        dplyr::mutate(rowname=recode(rowname,Intercept="Intercept.abs"),
+        dplyr::mutate(rowname=dplyr::recode(rowname,Intercept="Intercept.abs"),
                       Estimate=abs(Estimate))
       df.this=bind_rows(df.this,t) %>%
         dplyr::mutate(rowname=factor(rowname,ordered=T,levels=c('Stimulus difference','Intercept.abs','Intercept')))
@@ -931,7 +939,7 @@ main=session.comparisons %>%
   dplyr::select(-contains('Pr...'),-contains('Estimate__'),-contains('Std..Error'),-contains('p.value.session.main'),-CDMmNDM.ctrHR.p) %>% #,-BF.mean.customSD) %>%
   # sort the data frame frist by Modality, then by analysis.type, then by Subject.level.regression.weight
   dplyr::arrange(desc(Modality)) %>%
-  dplyr::mutate(Subject.level.regression.weight=recode(Subject.level.regression.weight,
+  dplyr::mutate(Subject.level.regression.weight=dplyr::recode(Subject.level.regression.weight,
                                                        DV_ResponseMinListen="Stimulus difference (Sound-Heart)",
                                                        easiness_ResponseMinListen.abs="Stimulus easiness",
                                                        ResponseCorrect="Correct response",
@@ -1217,7 +1225,8 @@ We compare:
 summedLogLiks=results.logLiks %>% group_by(session,Modality) %>%
   dplyr::summarize(logLik.avgBeep5tr.sum=sum(logLik.avgBeep5tr),
                    logLik.listenBeep.sum=sum(logLik.listenBeep),
-                   logLik.responseBeepOnly = sum(logLik.responseBeepOnly))
+                   logLik.responseBeepOnly = sum(logLik.responseBeepOnly),
+                   logLik.responesBeepAvg5trlisten=sum(logLik.responesBeepAvg5trlisten))
 
 t= results.logLiks %>% dplyr::mutate(logLik.avg.min.listen =logLik.avgBeep5tr - logLik.listenBeep,
                                      neg.loglik.listen_minus_soundOnly = -logLik.listenBeep -(-logLik.responseBeepOnly)) %>%
@@ -1239,6 +1248,8 @@ ggexport(this.plot,
          height = 7 * 300,  # Height in pixels (reduced height)
          res = 300) 
 
+
+
 t.summary = t %>% dplyr::group_by(session,Modality,best.model) %>% 
   dplyr::summarize(count.best.model=n())
 
@@ -1255,6 +1266,30 @@ t.summary.listenVsNothing.bySessionNumber = t %>%
 write.csv(t.summary,file=file.path(paths$stats,'logLikelihood_all.csv'))
 write.csv(t.summary.listenVsNothing.bySessionNumber,file=file.path(paths$stats,'logLikelihood_listenVsNothing_bySession.csv'))
 write.csv(t.summary.listenVsNothing,file=file.path(paths$stats,'logLikelihood_listenVsNothing.csv'))
+
+# Get percentages: have a better model fit for the model with heart beat + regression weight in the correct direction
+t.results.logLiks = results.logLiks%>% # find whether model with heart rate is better
+  dplyr::mutate(betterModel.compareTrialWiseBeep = case_when(logLik.listenBeep>logLik.responseBeepOnly ~ 'withListenTrialWiseStimBetter',
+                                                             T ~ 'withoutTrialWiseListenBetter'),
+                betterModel.compareAvgListen5tr = case_when(logLik.responesBeepAvg5trlisten>logLik.responseBeepOnly ~ 'with5trAvgListenBetter',
+                                                            T ~ 'without5trAvgListenBetter'))  %>%
+  dplyr::select(ID,session,Modality,betterModel.compareTrialWiseBeep,betterModel.compareAvgListen5tr)
+t.regrWeightDir =   results.indivModalities %>% 
+              dplyr::filter(regression %in% c('dec.listenRespBPMsep','avgHeartRate5tr.separate') & 
+                              rowname %in% c('listenBPM','rollingHeartAvg.5tr')) %>%
+              select(rowname,Estimate,ID, session,Modality,regression) %>%
+              pivot_wider(.,id_cols=c(ID,session,Modality),values_from='Estimate',names_from=c('rowname','regression'),names_prefix='regEstimate.')
+t=left_join(t.results.logLiks , t.regrWeightDir ,by=c('ID','session','Modality')) %>%
+  dplyr::mutate(double.evidence.doTaskWithListen.trialWise = regEstimate.listenBPM_dec.listenRespBPMsep<0 & betterModel.compareTrialWiseBeep== 'withListenTrialWiseStimBetter',
+                double.evidence.doTaskWithListen.5trAvg    = regEstimate.rollingHeartAvg.5tr_avgHeartRate5tr.separate<0 & betterModel.compareAvgListen5tr=='with5trAvgListenBetter') %>%
+  dplyr::group_by(session,Modality) %>% 
+  dplyr::summarize(count.double.evidence.doTaskWithListen.trialWise= sum(double.evidence.doTaskWithListen.trialWise==T),
+                   count.double.evidence.doTaskWithListen.5trAvg = sum(double.evidence.doTaskWithListen.5trAvg==T),
+                   count.logLik.doTaskWithListen.trialWise = sum(betterModel.compareTrialWiseBeep=='withListenTrialWiseStimBetter'),
+                   count.logLik.doTaskWithListen.with5trAvg = sum(betterModel.compareAvgListen5tr=='with5trAvgListenBetter'),
+                   nrow=n())
+
+
 
 ```
 
@@ -1279,7 +1314,9 @@ cardio.legrand.this = cardio.legrand %>% dplyr::group_by(ID,Modality)  %>%
                 rollingResponseAvg.5tr=rollapply(responseBPM,5,mean,align='right',fill=NA),
                 rollingResponseAvg.5tr.prev= lag(rollingResponseAvg.5tr),
                 DV_ResponseMinAvg5tr = responseBPM-rollingResponseAvg.5tr.prev,
-                Decision = recode(Decision,'More'=1,'Less'=0)) %>% dplyr::ungroup() 
+                rollingHeartAvg.5tr=rollapply(listenBPM,5,mean,align='right',fill=NA),# to use in model: previous as the other one includes the current trial
+                DV_ResponseMinAvgListen5tr=responseBPM-rollingHeartAvg.5tr,
+                Decision = dplyr::recode(Decision,'More'=1,'Less'=0)) %>% dplyr::ungroup() 
 # run regressions
 results.indivModalities.legrand=data.frame()
 results.logLiks.glms.legrand = data.frame()
@@ -1293,17 +1330,21 @@ for (isub in unique(cardio.legrand.this$ID)){
     # Control analyses
     glms$dec.listenRespBPMsep = glm(Decision~ listenBPM+responseBPM,data=df,family='binomial')
     glms$avgBeep5tr.separate = glm(Decision~listenBPM+rollingResponseAvg.5tr.prev+responseBPM,data=df,family='binomial')
+    glms$avgHeartRate5tr.separate = glm(Decision~rollingHeartAvg.5tr+responseBPM,data=df,family='binomial')
+    
     # comparison: with avg vs with listen (remove NA so we have the same amount of trials for each)
-    df.comparison= df %>% dplyr::select(Decision,DV_ResponseMinAvg5tr,DV_ResponseMinListen,responseBPM) %>% na.omit()
+    df.comparison= df %>% dplyr::select(Decision,DV_ResponseMinAvg5tr,DV_ResponseMinListen,DV_ResponseMinAvgListen5tr,responseBPM) %>% na.omit()
     glms$forLogLik.avgBeep5tr = glm(Decision ~ DV_ResponseMinAvg5tr,data=df.comparison,family='binomial')
     glms$forLogLik.listenBeep = glm(Decision ~ DV_ResponseMinListen,data=df.comparison,family='binomial')
     glms$forLogLik.responseBeepOnly = glm(Decision ~ responseBPM,data=df.comparison,family='binomial')
+    glms$forLogLik.avgHeart5tr = glm(Decision ~ DV_ResponseMinAvgListen5tr,data=df.comparison,family='binomial')
     
     results.logLiks.glms.legrand=bind_rows(results.logLiks.glms.legrand,
                                            data.frame(ID=isub,Modality=imod,
                                                       logLik.avgBeep5tr=logLik(glms$forLogLik.avgBeep5tr),
                                                       logLik.listenBeep=logLik(glms$forLogLik.listenBeep),
-                                                      logLik.responseBeepOnly = logLik( glms$forLogLik.responseBeepOnly)))
+                                                      logLik.responseBeepOnly = logLik( glms$forLogLik.responseBeepOnly),
+                                                      logLik.responesBeepAvg5trlisten = logLik(glms$forLogLik.avgHeart5tr)))
     
     for (ireg in names(glms)){
         t=as.data.frame(summary(glms[[ireg]])$coefficients) %>% tibble::rownames_to_column() %>%
@@ -1321,7 +1362,8 @@ Check the log likelihoods like in legrand data (less negative = better)
 summedLogLiks.legrand=results.logLiks.glms.legrand %>% group_by(Modality) %>%
   dplyr::summarize(logLik.avgBeep5tr.sum=sum(logLik.avgBeep5tr),
                    logLik.listenBeep.sum=sum(logLik.listenBeep),
-                   logLik.responseBeepOnly = sum(logLik.responseBeepOnly))
+                   logLik.responseBeepOnly = sum(logLik.responseBeepOnly),
+                   logLik.responesBeepAvg5trlisten=sum(logLik.responesBeepAvg5trlisten))
 
 t.legrand= results.logLiks.glms.legrand  %>%
   dplyr::mutate(best.model=case_when(logLik.avgBeep5tr >       logLik.listenBeep & logLik.avgBeep5tr > logLik.responseBeepOnly ~ 'logLik.avgBeep5tr',
@@ -1403,6 +1445,28 @@ write.csv(t.summary.legrand.listenVsAverage,file=file.path(paths$stats,'Legrand_
 write.csv(t.summary.legrand.best.model.NothingVsAvg5tr,file=file.path(paths$stats,'Legrand_likelihoods_NothingVsAvg5tr.csv'))
 
 
+# Get percentages: have a better model fit for the model with heart beat + regression weight in the correct direction
+t.results.logLiks.legrand = results.logLiks.glms.legrand%>% # find whether model with heart rate is better
+  dplyr::mutate(betterModel.compareTrialWiseBeep = case_when(logLik.listenBeep>logLik.responseBeepOnly ~ 'withListenTrialWiseStimBetter',
+                                                             T ~ 'withoutTrialWiseListenBetter'),
+                betterModel.compareAvgListen5tr = case_when(logLik.responesBeepAvg5trlisten>logLik.responseBeepOnly ~ 'with5trAvgListenBetter',
+                                                            T ~ 'without5trAvgListenBetter'))  %>%
+  dplyr::select(ID,Modality,betterModel.compareTrialWiseBeep,betterModel.compareAvgListen5tr)
+t.regrWeightDir.legrand =   results.indivModalities.legrand %>% 
+              dplyr::filter(regression %in% c('dec.listenRespBPMsep','avgHeartRate5tr.separate') & 
+                              rowname %in% c('listenBPM','rollingHeartAvg.5tr')) %>%
+              select(rowname,Estimate,ID,Modality,regression) %>%
+              pivot_wider(.,id_cols=c(ID,Modality),values_from='Estimate',names_from=c('rowname','regression'),names_prefix='regEstimate.')
+t=left_join(t.results.logLiks.legrand , t.regrWeightDir.legrand ,by=c('ID','Modality')) %>%
+  dplyr::mutate(double.evidence.doTaskWithListen.trialWise = regEstimate.listenBPM_dec.listenRespBPMsep<0 & betterModel.compareTrialWiseBeep== 'withListenTrialWiseStimBetter',
+                double.evidence.doTaskWithListen.5trAvg    = regEstimate.rollingHeartAvg.5tr_avgHeartRate5tr.separate<0 & betterModel.compareAvgListen5tr=='with5trAvgListenBetter') %>%
+  dplyr::group_by(Modality) %>% 
+  dplyr::summarize(count.double.evidence.doTaskWithListen.trialWise= sum(double.evidence.doTaskWithListen.trialWise==T),
+                   count.double.evidence.doTaskWithListen.5trAvg = sum(double.evidence.doTaskWithListen.5trAvg==T),
+                   count.logLik.doTaskWithListen.trialWise = sum(betterModel.compareTrialWiseBeep=='withListenTrialWiseStimBetter'),
+                   count.logLik.doTaskWithListen.with5trAvg = sum(betterModel.compareAvgListen5tr=='with5trAvgListenBetter'),
+                   nrow=n())
+
 
 ```
 
@@ -1429,8 +1493,8 @@ write.csv(t,file=file.path(paths$stats,'Legrand_regression_weights_stats.csv'))
 
 plots=list()
 df=results.indivModalities.legrand %>% dplyr::filter(regression %in% c('dec.listenRespBPMsep')) %>% 
-  dplyr::mutate(rowname=case_when(Modality=='Extero' ~ recode(rowname,`(Intercept)` = 'Intercept',listenBPM='1st sound',responseBPM = '2nd sound'),
-                                  Modality=='Intero' ~ recode(rowname,`(Intercept)` = 'Intercept',listenBPM='Heartrate',responseBPM = 'Sound')))
+  dplyr::mutate(rowname=case_when(Modality=='Extero' ~ dplyr::recode(rowname,`(Intercept)` = 'Intercept',listenBPM='1st sound',responseBPM = '2nd sound'),
+                                  Modality=='Intero' ~ dplyr::recode(rowname,`(Intercept)` = 'Intercept',listenBPM='Heartrate',responseBPM = 'Sound')))
                                                               
                                
              
@@ -1475,6 +1539,37 @@ ggexport(figure,filename=file.path(paths$figures,'Legrand_RegressionWeights.tiff
 
 ```
 
+Hierarchical regression
+```{r}
+my.prior=c(prior(normal(0,3),class='b')) 
+df= cardio.legrand.this %>% dplyr::filter(Modality=='Intero') %>% dplyr::mutate_if(is.numeric,scale)
+fit.legrand.listenBPM.intero = brm(Decision~ (responseBPM + listenBPM) + (responseBPM+ listenBPM|ID) ,
+          data=df,family=bernoulli(link='logit'),prior=my.prior)
+fit.legrand.listenBPM5trAvg.intero = brm(Decision~ (responseBPM + rollingHeartAvg.5tr) + (responseBPM+ rollingHeartAvg.5tr|ID) ,
+          data=df,family=bernoulli(link='logit'),prior=my.prior)
+
+sink(file.path(paths$stats,'Legrand_HierarchicalRegression_Interoception.txt'))
+print(summary(fit.legrand.listenBPM.intero))
+print(summary(fit.legrand.listenBPM5trAvg.intero))
+sink()
+p= conditional_effects(fit.legrand.listenBPM.intero, effects = 'listenBPM', robust = TRUE) 
+p1=plot(p,points = F, plot = F)[[1]]
+p= conditional_effects(fit.legrand.listenBPM.intero, effects = 'responseBPM', robust = TRUE) 
+p2=plot(p,points = F, plot = F)[[1]]
+plot.listenBPM=ggarrange(p1,p2)
+
+p= conditional_effects(fit.legrand.listenBPM5trAvg.intero, effects = 'rollingHeartAvg.5tr', robust = TRUE) 
+p1=plot(p,points = F, plot = F)[[1]]
+p= conditional_effects(fit.legrand.listenBPM5trAvg.intero, effects = 'responseBPM', robust = TRUE) 
+p2=plot(p,points = F, plot = F)[[1]]
+plot.listenBPM.avg=ggarrange(p1,p2)
+
+out=ggarrange(plot.listenBPM,plot.listenBPM.avg,nrow=2)
+ggexport(out, filename=file.path(paths$figures,'Legrand_HierarchicalRegression_Interoception_differentSettings.tiff'),
+         width = 7 * 300,  # Width in pixels (7 inches at 300 DPI)
+         height = 7 * 300,  # Height in pixels (reduced height)
+         res = 300)
+```
 
 #TP CODE:
 Code for above with different way to calculate absolute. Instead of absA - absB we perform A - B then apply 'abs'to the answer. (e.g. -5 - 2 = -7 but 5 - 2 = 5)
