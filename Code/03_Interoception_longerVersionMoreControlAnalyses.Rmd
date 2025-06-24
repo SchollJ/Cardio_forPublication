@@ -1547,11 +1547,19 @@ fit.legrand.listenBPM.intero = brm(Decision~ (responseBPM + listenBPM) + (respon
           data=df,family=bernoulli(link='logit'),prior=my.prior)
 fit.legrand.listenBPM5trAvg.intero = brm(Decision~ (responseBPM + rollingHeartAvg.5tr) + (responseBPM+ rollingHeartAvg.5tr|ID) ,
           data=df,family=bernoulli(link='logit'),prior=my.prior)
+fit.legrand.soundBPM5trAvg.intero = brm(Decision~ (responseBPM + rollingResponseAvg.5tr.prev) + (responseBPM+ rollingResponseAvg.5tr.prev|ID) ,
+          data=df,family=bernoulli(link='logit'),prior=my.prior)
+fit.legrand.soundBPM5trAvg.hear5travg.intero = brm(Decision~ (responseBPM + rollingResponseAvg.5tr.prev + rollingHeartAvg.5tr) + 
+                                                             (responseBPM+  rollingResponseAvg.5tr.prev+  rollingHeartAvg.5tr|ID) ,
+          data=df,family=bernoulli(link='logit'),prior=my.prior)
 
 sink(file.path(paths$stats,'Legrand_HierarchicalRegression_Interoception.txt'))
 print(summary(fit.legrand.listenBPM.intero))
 print(summary(fit.legrand.listenBPM5trAvg.intero))
+print(summary(fit.legrand.soundBPM5trAvg.intero))
+print(summary(fit.legrand.soundBPM5trAvg.hear5travg.intero))
 sink()
+
 p= conditional_effects(fit.legrand.listenBPM.intero, effects = 'listenBPM', robust = TRUE) 
 p1=plot(p,points = F, plot = F)[[1]]
 p= conditional_effects(fit.legrand.listenBPM.intero, effects = 'responseBPM', robust = TRUE) 
@@ -1564,7 +1572,14 @@ p= conditional_effects(fit.legrand.listenBPM5trAvg.intero, effects = 'responseBP
 p2=plot(p,points = F, plot = F)[[1]]
 plot.listenBPM.avg=ggarrange(p1,p2)
 
-out=ggarrange(plot.listenBPM,plot.listenBPM.avg,nrow=2)
+p= conditional_effects(fit.legrand.soundBPM5trAvg.intero, effects = 'rollingResponseAvg.5tr.prev', robust = TRUE) 
+p1=plot(p,points = F, plot = F)[[1]]
+p= conditional_effects(fit.legrand.soundBPM5trAvg.intero, effects = 'responseBPM', robust = TRUE) 
+p2=plot(p,points = F, plot = F)[[1]]
+plot.soundBPM.avg=ggarrange(p1,p2)
+
+
+out=ggarrange(plot.listenBPM,plot.listenBPM.avg,plot.soundBPM.avg, nrow=3)
 ggexport(out, filename=file.path(paths$figures,'Legrand_HierarchicalRegression_Interoception_differentSettings.tiff'),
          width = 7 * 300,  # Width in pixels (7 inches at 300 DPI)
          height = 7 * 300,  # Height in pixels (reduced height)

@@ -50,3 +50,60 @@ rollingHeartAvg.5tr    -0.56      0.12    -0.79    -0.32 1.00     3691     2683
 Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 and Tail_ESS are effective sample size measures, and Rhat is the potential
 scale reduction factor on split chains (at convergence, Rhat = 1).
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: Decision ~ (responseBPM + rollingResponseAvg.5tr.prev) + (responseBPM + rollingResponseAvg.5tr.prev | ID) 
+   Data: df (Number of observations: 27880) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Multilevel Hyperparameters:
+~ID (Number of levels: 218) 
+                                             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                                    1.76      0.11     1.55     1.98 1.01      828     1647
+sd(responseBPM)                                  1.38      0.09     1.22     1.56 1.00     1090     2274
+sd(rollingResponseAvg.5tr.prev)                  0.67      0.06     0.56     0.79 1.00     1239     2744
+cor(Intercept,responseBPM)                       0.31      0.08     0.16     0.46 1.00      866     1383
+cor(Intercept,rollingResponseAvg.5tr.prev)       0.10      0.09    -0.08     0.28 1.00     1857     2605
+cor(responseBPM,rollingResponseAvg.5tr.prev)    -0.44      0.09    -0.60    -0.25 1.00     1690     2772
+
+Regression Coefficients:
+                            Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept                       0.30      0.12     0.09     0.55 1.05       96      453
+responseBPM                     3.66      0.11     3.45     3.88 1.01      871     1338
+rollingResponseAvg.5tr.prev    -0.71      0.06    -0.83    -0.58 1.00     2024     2642
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: Decision ~ (responseBPM + rollingResponseAvg.5tr.prev + rollingHeartAvg.5tr) + (responseBPM + rollingResponseAvg.5tr.prev + rollingHeartAvg.5tr | ID) 
+   Data: df (Number of observations: 27880) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Multilevel Hyperparameters:
+~ID (Number of levels: 218) 
+                                                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                                            1.82      0.12     1.58     2.07 1.00     1281     2266
+sd(responseBPM)                                          1.40      0.09     1.23     1.58 1.00     1734     2445
+sd(rollingResponseAvg.5tr.prev)                          0.72      0.06     0.60     0.84 1.00     1994     2536
+sd(rollingHeartAvg.5tr)                                  1.23      0.12     1.01     1.46 1.00     1390     2503
+cor(Intercept,responseBPM)                               0.35      0.08     0.18     0.50 1.00     1081     1924
+cor(Intercept,rollingResponseAvg.5tr.prev)               0.13      0.10    -0.06     0.31 1.00     1805     2354
+cor(responseBPM,rollingResponseAvg.5tr.prev)            -0.38      0.09    -0.56    -0.19 1.00     1976     2592
+cor(Intercept,rollingHeartAvg.5tr)                       0.02      0.11    -0.18     0.23 1.00     1952     2401
+cor(responseBPM,rollingHeartAvg.5tr)                     0.11      0.11    -0.11     0.31 1.00     1939     2345
+cor(rollingResponseAvg.5tr.prev,rollingHeartAvg.5tr)    -0.30      0.11    -0.50    -0.07 1.00     1015     1739
+
+Regression Coefficients:
+                            Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept                       0.44      0.14     0.18     0.72 1.01      620     1188
+responseBPM                     3.79      0.11     3.58     4.01 1.00     1305     2320
+rollingResponseAvg.5tr.prev    -0.62      0.07    -0.75    -0.48 1.00     2296     3019
+rollingHeartAvg.5tr            -0.31      0.11    -0.53    -0.09 1.00     2534     2575
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
