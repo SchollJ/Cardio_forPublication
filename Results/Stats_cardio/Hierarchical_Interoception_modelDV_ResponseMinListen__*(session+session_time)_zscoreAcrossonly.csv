@@ -1,0 +1,7 @@
+"","Estimate","Est.Error","Q2.5","Q97.5"
+"Intercept",0.47,0.48,-0.47,1.45
+"DV_ResponseMinListen",2.87,0.3,2.31,3.49
+"sessionNDM",-0.29,0.33,-0.94,0.37
+"session_timesession2",-0.39,0.35,-1.08,0.29
+"DV_ResponseMinListen:sessionNDM",-0.04,0.28,-0.6,0.52
+"DV_ResponseMinListen:session_timesession2",0.55,0.34,-0.06,1.24

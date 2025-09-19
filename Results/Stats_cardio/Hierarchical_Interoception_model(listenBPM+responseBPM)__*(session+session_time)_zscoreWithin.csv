@@ -1,0 +1,10 @@
+"","Estimate","Est.Error","Q2.5","Q97.5"
+"Intercept",0.27,0.11,0.06,0.49
+"listenBPM",0.06,0.11,-0.15,0.28
+"responseBPM",2.14,0.17,1.83,2.49
+"sessionNDM",-0.04,0.13,-0.3,0.23
+"session_timesession2",-0.03,0.13,-0.29,0.24
+"listenBPM:sessionNDM",-0.18,0.15,-0.48,0.11
+"listenBPM:session_timesession2",0.2,0.16,-0.12,0.54
+"responseBPM:sessionNDM",-0.05,0.2,-0.43,0.34
+"responseBPM:session_timesession2",0.28,0.21,-0.12,0.73

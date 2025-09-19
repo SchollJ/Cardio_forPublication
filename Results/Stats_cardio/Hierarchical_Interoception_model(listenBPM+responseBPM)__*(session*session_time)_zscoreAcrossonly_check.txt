@@ -1,0 +1,107 @@
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: Decision.num ~ (listenBPM + responseBPM) * (session * session_time) + ((listenBPM + responseBPM) * (session * session_time) | ID) 
+   Data: df (Number of observations: 2344) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Multilevel Hyperparameters:
+~ID (Number of levels: 24) 
+                                                                                           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                                                                                  1.77      0.40     1.06     2.68 1.00     1837     2114
+sd(listenBPM)                                                                                  0.37      0.24     0.02     0.91 1.00     1642     2666
+sd(responseBPM)                                                                                1.12      0.28     0.64     1.75 1.00     2847     2792
+sd(sessionNDM)                                                                                 0.52      0.37     0.02     1.36 1.00     1664     2353
+sd(session_timesession2)                                                                       0.67      0.46     0.03     1.72 1.00     1241     2545
+sd(sessionNDM:session_timesession2)                                                            0.95      0.62     0.05     2.36 1.00     2001     2815
+sd(listenBPM:sessionNDM)                                                                       0.44      0.34     0.02     1.28 1.00     2204     2875
+sd(listenBPM:session_timesession2)                                                             0.92      0.42     0.12     1.82 1.00     1812     1352
+sd(responseBPM:sessionNDM)                                                                     0.43      0.31     0.02     1.13 1.00     1563     2379
+sd(responseBPM:session_timesession2)                                                           0.81      0.40     0.09     1.69 1.00     1631     1808
+sd(listenBPM:sessionNDM:session_timesession2)                                                  0.89      0.66     0.04     2.51 1.00     2159     2510
+sd(responseBPM:sessionNDM:session_timesession2)                                                0.65      0.51     0.03     1.89 1.00     2778     2431
+cor(Intercept,listenBPM)                                                                       0.07      0.27    -0.44     0.57 1.00     7211     3234
+cor(Intercept,responseBPM)                                                                     0.05      0.20    -0.35     0.43 1.00     4161     3214
+cor(listenBPM,responseBPM)                                                                    -0.10      0.26    -0.58     0.43 1.00     1116     1948
+cor(Intercept,sessionNDM)                                                                      0.04      0.27    -0.48     0.56 1.00     6745     2759
+cor(listenBPM,sessionNDM)                                                                     -0.02      0.28    -0.54     0.52 1.00     5259     3615
+cor(responseBPM,sessionNDM)                                                                    0.07      0.26    -0.46     0.56 1.00     5220     3455
+cor(Intercept,session_timesession2)                                                            0.10      0.27    -0.44     0.60 1.00     6384     3338
+cor(listenBPM,session_timesession2)                                                           -0.01      0.27    -0.53     0.52 1.00     4678     3117
+cor(responseBPM,session_timesession2)                                                          0.11      0.26    -0.41     0.57 1.00     4721     3433
+cor(sessionNDM,session_timesession2)                                                           0.06      0.29    -0.51     0.60 1.00     3704     2943
+cor(Intercept,sessionNDM:session_timesession2)                                                 0.03      0.27    -0.48     0.54 1.00     7613     3090
+cor(listenBPM,sessionNDM:session_timesession2)                                                -0.02      0.28    -0.55     0.53 1.00     4431     3179
+cor(responseBPM,sessionNDM:session_timesession2)                                               0.14      0.27    -0.42     0.63 1.00     5698     3154
+cor(sessionNDM,sessionNDM:session_timesession2)                                               -0.02      0.28    -0.56     0.52 1.00     4762     3203
+cor(session_timesession2,sessionNDM:session_timesession2)                                     -0.02      0.27    -0.55     0.50 1.00     3861     3646
+cor(Intercept,listenBPM:sessionNDM)                                                           -0.00      0.27    -0.53     0.51 1.00     6250     3250
+cor(listenBPM,listenBPM:sessionNDM)                                                           -0.05      0.28    -0.58     0.51 1.00     4965     3033
+cor(responseBPM,listenBPM:sessionNDM)                                                          0.01      0.27    -0.50     0.54 1.00     6884     3056
+cor(sessionNDM,listenBPM:sessionNDM)                                                          -0.00      0.28    -0.54     0.53 1.00     4982     3600
+cor(session_timesession2,listenBPM:sessionNDM)                                                 0.01      0.28    -0.53     0.54 1.00     3944     2729
+cor(sessionNDM:session_timesession2,listenBPM:sessionNDM)                                      0.00      0.28    -0.52     0.54 1.00     4013     3155
+cor(Intercept,listenBPM:session_timesession2)                                                 -0.12      0.25    -0.58     0.38 1.00     6134     3459
+cor(listenBPM,listenBPM:session_timesession2)                                                 -0.04      0.28    -0.55     0.52 1.00     3427     3113
+cor(responseBPM,listenBPM:session_timesession2)                                               -0.23      0.25    -0.66     0.29 1.00     4074     3185
+cor(sessionNDM,listenBPM:session_timesession2)                                                -0.01      0.28    -0.54     0.53 1.00     3728     3309
+cor(session_timesession2,listenBPM:session_timesession2)                                      -0.06      0.27    -0.58     0.48 1.00     3462     3714
+cor(sessionNDM:session_timesession2,listenBPM:session_timesession2)                           -0.04      0.27    -0.55     0.48 1.00     3433     3437
+cor(listenBPM:sessionNDM,listenBPM:session_timesession2)                                      -0.02      0.27    -0.53     0.49 1.00     3564     3555
+cor(Intercept,responseBPM:sessionNDM)                                                          0.09      0.26    -0.44     0.56 1.00     5963     3086
+cor(listenBPM,responseBPM:sessionNDM)                                                          0.02      0.28    -0.51     0.54 1.00     5633     3018
+cor(responseBPM,responseBPM:sessionNDM)                                                       -0.04      0.27    -0.56     0.49 1.00     5311     3094
+cor(sessionNDM,responseBPM:sessionNDM)                                                        -0.01      0.28    -0.54     0.55 1.00     4398     3251
+cor(session_timesession2,responseBPM:sessionNDM)                                               0.02      0.27    -0.49     0.53 1.00     4405     3709
+cor(sessionNDM:session_timesession2,responseBPM:sessionNDM)                                   -0.01      0.28    -0.54     0.53 1.00     3543     3182
+cor(listenBPM:sessionNDM,responseBPM:sessionNDM)                                               0.01      0.28    -0.55     0.53 1.00     2948     2783
+cor(listenBPM:session_timesession2,responseBPM:sessionNDM)                                    -0.06      0.28    -0.60     0.50 1.00     3035     3336
+cor(Intercept,responseBPM:session_timesession2)                                                0.02      0.24    -0.45     0.48 1.00     5213     3096
+cor(listenBPM,responseBPM:session_timesession2)                                               -0.04      0.27    -0.56     0.50 1.00     3372     3110
+cor(responseBPM,responseBPM:session_timesession2)                                              0.15      0.25    -0.35     0.62 1.00     6045     3261
+cor(sessionNDM,responseBPM:session_timesession2)                                               0.01      0.27    -0.51     0.55 1.00     3723     3504
+cor(session_timesession2,responseBPM:session_timesession2)                                    -0.00      0.27    -0.51     0.50 1.00     3380     3398
+cor(sessionNDM:session_timesession2,responseBPM:session_timesession2)                          0.03      0.27    -0.49     0.55 1.00     3381     3572
+cor(listenBPM:sessionNDM,responseBPM:session_timesession2)                                    -0.04      0.27    -0.55     0.49 1.00     3230     3352
+cor(listenBPM:session_timesession2,responseBPM:session_timesession2)                          -0.09      0.27    -0.59     0.43 1.00     3274     3286
+cor(responseBPM:sessionNDM,responseBPM:session_timesession2)                                  -0.02      0.27    -0.55     0.50 1.00     3203     3781
+cor(Intercept,listenBPM:sessionNDM:session_timesession2)                                      -0.05      0.27    -0.56     0.47 1.00     6957     2928
+cor(listenBPM,listenBPM:sessionNDM:session_timesession2)                                      -0.01      0.28    -0.53     0.53 1.00     5124     3026
+cor(responseBPM,listenBPM:sessionNDM:session_timesession2)                                    -0.07      0.26    -0.55     0.47 1.00     5574     3316
+cor(sessionNDM,listenBPM:sessionNDM:session_timesession2)                                     -0.01      0.28    -0.56     0.53 1.00     4205     3135
+cor(session_timesession2,listenBPM:sessionNDM:session_timesession2)                           -0.02      0.27    -0.54     0.50 1.00     4037     3348
+cor(sessionNDM:session_timesession2,listenBPM:sessionNDM:session_timesession2)                -0.03      0.28    -0.56     0.52 1.00     3752     3366
+cor(listenBPM:sessionNDM,listenBPM:sessionNDM:session_timesession2)                           -0.02      0.28    -0.56     0.51 1.00     3242     3453
+cor(listenBPM:session_timesession2,listenBPM:sessionNDM:session_timesession2)                 -0.02      0.28    -0.54     0.53 1.00     3857     3262
+cor(responseBPM:sessionNDM,listenBPM:sessionNDM:session_timesession2)                         -0.02      0.28    -0.54     0.53 1.00     3165     3494
+cor(responseBPM:session_timesession2,listenBPM:sessionNDM:session_timesession2)               -0.06      0.28    -0.57     0.47 1.00     3423     3557
+cor(Intercept,responseBPM:sessionNDM:session_timesession2)                                     0.09      0.27    -0.45     0.60 1.00     7738     3149
+cor(listenBPM,responseBPM:sessionNDM:session_timesession2)                                     0.01      0.28    -0.51     0.54 1.00     6147     3113
+cor(responseBPM,responseBPM:sessionNDM:session_timesession2)                                   0.03      0.27    -0.49     0.54 1.00     7152     3068
+cor(sessionNDM,responseBPM:sessionNDM:session_timesession2)                                    0.00      0.28    -0.55     0.55 1.00     5111     3337
+cor(session_timesession2,responseBPM:sessionNDM:session_timesession2)                          0.02      0.28    -0.53     0.54 1.00     4314     3050
+cor(sessionNDM:session_timesession2,responseBPM:sessionNDM:session_timesession2)               0.02      0.27    -0.52     0.53 1.00     3615     3523
+cor(listenBPM:sessionNDM,responseBPM:sessionNDM:session_timesession2)                         -0.01      0.27    -0.53     0.52 1.00     2987     3065
+cor(listenBPM:session_timesession2,responseBPM:sessionNDM:session_timesession2)               -0.05      0.28    -0.58     0.49 1.00     3775     3426
+cor(responseBPM:sessionNDM,responseBPM:sessionNDM:session_timesession2)                       -0.03      0.27    -0.55     0.49 1.00     3138     2992
+cor(responseBPM:session_timesession2,responseBPM:sessionNDM:session_timesession2)             -0.06      0.28    -0.58     0.49 1.00     3335     3337
+cor(listenBPM:sessionNDM:session_timesession2,responseBPM:sessionNDM:session_timesession2)    -0.04      0.28    -0.57     0.51 1.00     2163     2843
+
+Regression Coefficients:
+                                            Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept                                      -0.22      0.50    -1.20     0.75 1.00     1244     1846
+listenBPM                                       0.02      0.29    -0.55     0.60 1.00     3203     3049
+responseBPM                                     3.17      0.38     2.45     3.97 1.00     2699     2770
+sessionNDM                                      1.11      0.71    -0.31     2.52 1.00     1341     1907
+session_timesession2                            0.67      0.75    -0.82     2.12 1.00     1316     2017
+sessionNDM:session_timesession2                -1.60      1.44    -4.44     1.32 1.00     1380     1876
+listenBPM:sessionNDM                           -0.15      0.47    -1.08     0.77 1.00     2723     2534
+listenBPM:session_timesession2                  0.10      0.53    -0.91     1.18 1.00     2646     2981
+responseBPM:sessionNDM                         -0.51      0.54    -1.59     0.55 1.00     2041     2424
+responseBPM:session_timesession2                0.11      0.62    -1.13     1.35 1.00     2361     2640
+listenBPM:sessionNDM:session_timesession2       0.11      0.90    -1.59     1.90 1.00     2511     2525
+responseBPM:sessionNDM:session_timesession2     1.19      1.11    -0.90     3.45 1.00     2096     2279
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).

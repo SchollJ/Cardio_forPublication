@@ -1,0 +1,44 @@
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: Decision.num ~ DV_ResponseMinListen * (session + session_time) + (DV_ResponseMinListen * (session + session_time) | ID) 
+   Data: df (Number of observations: 2344) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Multilevel Hyperparameters:
+~ID (Number of levels: 24) 
+                                                                               Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                                                                      0.18      0.11     0.01     0.41 1.01     1261     1842
+sd(DV_ResponseMinListen)                                                           0.41      0.14     0.14     0.70 1.00     1165      890
+sd(sessionNDM)                                                                     0.13      0.10     0.00     0.37 1.00     1886     1971
+sd(session_timesession2)                                                           0.15      0.11     0.01     0.41 1.00     1999     2519
+sd(DV_ResponseMinListen:sessionNDM)                                                0.18      0.14     0.01     0.51 1.00     1945     1805
+sd(DV_ResponseMinListen:session_timesession2)                                      0.23      0.16     0.01     0.61 1.00     1493     2354
+cor(Intercept,DV_ResponseMinListen)                                                0.22      0.33    -0.49     0.79 1.00     1236     2066
+cor(Intercept,sessionNDM)                                                         -0.01      0.38    -0.71     0.70 1.00     6179     2892
+cor(DV_ResponseMinListen,sessionNDM)                                               0.09      0.38    -0.66     0.76 1.00     5317     2863
+cor(Intercept,session_timesession2)                                                0.00      0.37    -0.69     0.69 1.00     6649     2875
+cor(DV_ResponseMinListen,session_timesession2)                                    -0.02      0.37    -0.71     0.67 1.00     4324     2805
+cor(sessionNDM,session_timesession2)                                              -0.01      0.38    -0.71     0.72 1.00     3258     3029
+cor(Intercept,DV_ResponseMinListen:sessionNDM)                                    -0.01      0.39    -0.74     0.72 1.00     6593     2726
+cor(DV_ResponseMinListen,DV_ResponseMinListen:sessionNDM)                         -0.04      0.38    -0.72     0.70 1.00     5265     3219
+cor(sessionNDM,DV_ResponseMinListen:sessionNDM)                                    0.01      0.38    -0.69     0.72 1.00     3627     3123
+cor(session_timesession2,DV_ResponseMinListen:sessionNDM)                         -0.01      0.38    -0.71     0.70 1.00     3201     3397
+cor(Intercept,DV_ResponseMinListen:session_timesession2)                           0.02      0.38    -0.69     0.71 1.00     4816     3020
+cor(DV_ResponseMinListen,DV_ResponseMinListen:session_timesession2)                0.07      0.37    -0.64     0.74 1.00     4502     2593
+cor(sessionNDM,DV_ResponseMinListen:session_timesession2)                          0.03      0.38    -0.70     0.72 1.00     2931     3639
+cor(session_timesession2,DV_ResponseMinListen:session_timesession2)                0.01      0.38    -0.69     0.73 1.00     3172     3360
+cor(DV_ResponseMinListen:sessionNDM,DV_ResponseMinListen:session_timesession2)    -0.01      0.38    -0.71     0.71 1.00     2574     3323
+
+Regression Coefficients:
+                                          Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept                                     0.26      0.11     0.05     0.47 1.00     5932     3518
+DV_ResponseMinListen                          1.89      0.15     1.59     2.20 1.00     3557     2740
+sessionNDM                                   -0.04      0.12    -0.28     0.21 1.00     6214     2991
+session_timesession2                         -0.02      0.13    -0.27     0.23 1.00     6705     2761
+DV_ResponseMinListen:sessionNDM              -0.04      0.15    -0.33     0.26 1.00     4411     2992
+DV_ResponseMinListen:session_timesession2     0.10      0.16    -0.21     0.43 1.00     4936     2675
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).

@@ -1,0 +1,50 @@
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: Decision.num ~ (rollingHeartAvg.5tr + responseBPM) * (session * order) + ((rollingHeartAvg.5tr + responseBPM) * session | ID) 
+   Data: df (Number of observations: 2195) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Multilevel Hyperparameters:
+~ID (Number of levels: 24) 
+                                                           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                                                  0.35      0.15     0.05     0.65 1.00      898      587
+sd(rollingHeartAvg.5tr)                                        0.17      0.11     0.01     0.42 1.00     1329     1693
+sd(responseBPM)                                                0.58      0.16     0.29     0.93 1.00     2170     2338
+sd(sessionNDM)                                                 0.26      0.17     0.02     0.66 1.00     1136     1342
+sd(rollingHeartAvg.5tr:sessionNDM)                             0.36      0.20     0.02     0.76 1.00      864     1086
+sd(responseBPM:sessionNDM)                                     0.33      0.22     0.02     0.84 1.00     1276     1597
+cor(Intercept,rollingHeartAvg.5tr)                             0.07      0.35    -0.62     0.71 1.00     4164     3105
+cor(Intercept,responseBPM)                                     0.21      0.29    -0.41     0.72 1.00     1437     1969
+cor(rollingHeartAvg.5tr,responseBPM)                          -0.25      0.34    -0.81     0.50 1.01      846     1457
+cor(Intercept,sessionNDM)                                      0.07      0.36    -0.63     0.73 1.00     4025     2890
+cor(rollingHeartAvg.5tr,sessionNDM)                           -0.02      0.37    -0.71     0.69 1.00     3006     2933
+cor(responseBPM,sessionNDM)                                    0.17      0.34    -0.51     0.74 1.00     3563     3265
+cor(Intercept,rollingHeartAvg.5tr:sessionNDM)                  0.01      0.34    -0.63     0.64 1.00     2679     2500
+cor(rollingHeartAvg.5tr,rollingHeartAvg.5tr:sessionNDM)       -0.12      0.38    -0.77     0.63 1.00     1768     2405
+cor(responseBPM,rollingHeartAvg.5tr:sessionNDM)               -0.09      0.32    -0.67     0.56 1.00     3032     3278
+cor(sessionNDM,rollingHeartAvg.5tr:sessionNDM)                -0.06      0.36    -0.72     0.66 1.00     2308     2678
+cor(Intercept,responseBPM:sessionNDM)                          0.02      0.36    -0.65     0.70 1.00     4232     2921
+cor(rollingHeartAvg.5tr,responseBPM:sessionNDM)               -0.03      0.37    -0.72     0.69 1.00     2608     3218
+cor(responseBPM,responseBPM:sessionNDM)                        0.05      0.36    -0.62     0.74 1.00     3814     2796
+cor(sessionNDM,responseBPM:sessionNDM)                         0.04      0.36    -0.67     0.70 1.00     2689     3302
+cor(rollingHeartAvg.5tr:sessionNDM,responseBPM:sessionNDM)     0.16      0.37    -0.57     0.78 1.00     2654     3367
+
+Regression Coefficients:
+                                              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept                                         0.30      0.17    -0.02     0.63 1.00     2439     2702
+rollingHeartAvg.5tr                               0.05      0.13    -0.20     0.31 1.00     2336     2620
+responseBPM                                       2.31      0.23     1.87     2.79 1.00     1860     2659
+sessionNDM                                       -0.06      0.19    -0.43     0.32 1.00     2587     2810
+orderNDM.first                                   -0.04      0.24    -0.50     0.42 1.00     2540     3160
+sessionNDM:orderNDM.first                         0.13      0.28    -0.42     0.68 1.00     2717     3172
+rollingHeartAvg.5tr:sessionNDM                   -0.17      0.21    -0.58     0.23 1.00     2147     2566
+rollingHeartAvg.5tr:orderNDM.first               -0.20      0.19    -0.58     0.17 1.00     2219     2550
+responseBPM:sessionNDM                            0.24      0.27    -0.26     0.77 1.00     2421     2545
+responseBPM:orderNDM.first                       -0.06      0.34    -0.71     0.62 1.00     1762     2197
+rollingHeartAvg.5tr:sessionNDM:orderNDM.first    -0.09      0.31    -0.70     0.53 1.00     2145     2267
+responseBPM:sessionNDM:orderNDM.first            -0.31      0.37    -1.07     0.42 1.00     2643     2912
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).

@@ -1,0 +1,107 @@
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: Decision.num ~ (rollingHeartAvg.5tr + responseBPM + rollingResponseAvg.5tr.prev) * (session + session_time) + ((rollingHeartAvg.5tr + responseBPM + rollingResponseAvg.5tr.prev) * (session + session_time) | ID) 
+   Data: df (Number of observations: 2156) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Multilevel Hyperparameters:
+~ID (Number of levels: 24) 
+                                                                                               Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                                                                                      0.84      0.34     0.20     1.54 1.00     1026     1023
+sd(rollingHeartAvg.5tr)                                                                            0.61      0.31     0.06     1.26 1.00     1235     1467
+sd(responseBPM)                                                                                    1.14      0.29     0.63     1.78 1.00     2675     2813
+sd(rollingResponseAvg.5tr.prev)                                                                    0.58      0.25     0.09     1.10 1.00     1782     1257
+sd(sessionNDM)                                                                                     0.67      0.41     0.04     1.54 1.00     1311     2256
+sd(session_timesession2)                                                                           0.56      0.39     0.02     1.44 1.00     1619     2448
+sd(rollingHeartAvg.5tr:sessionNDM)                                                                 0.45      0.34     0.02     1.27 1.00     1998     2815
+sd(rollingHeartAvg.5tr:session_timesession2)                                                       0.50      0.34     0.02     1.30 1.00     2139     2152
+sd(responseBPM:sessionNDM)                                                                         0.50      0.34     0.02     1.26 1.00     1630     2415
+sd(responseBPM:session_timesession2)                                                               0.67      0.38     0.04     1.46 1.00     1832     1930
+sd(rollingResponseAvg.5tr.prev:sessionNDM)                                                         0.51      0.34     0.02     1.28 1.00     1771     2657
+sd(rollingResponseAvg.5tr.prev:session_timesession2)                                               0.50      0.33     0.02     1.24 1.00     1744     2003
+cor(Intercept,rollingHeartAvg.5tr)                                                                -0.01      0.26    -0.49     0.50 1.00     5078     3506
+cor(Intercept,responseBPM)                                                                         0.05      0.22    -0.38     0.48 1.00     2721     2313
+cor(rollingHeartAvg.5tr,responseBPM)                                                              -0.20      0.25    -0.66     0.31 1.00     1632     1995
+cor(Intercept,rollingResponseAvg.5tr.prev)                                                        -0.18      0.25    -0.63     0.34 1.00     2932     3041
+cor(rollingHeartAvg.5tr,rollingResponseAvg.5tr.prev)                                               0.09      0.27    -0.43     0.60 1.00     3342     3210
+cor(responseBPM,rollingResponseAvg.5tr.prev)                                                      -0.28      0.24    -0.69     0.22 1.00     4605     3651
+cor(Intercept,sessionNDM)                                                                          0.01      0.27    -0.52     0.53 1.00     5512     3272
+cor(rollingHeartAvg.5tr,sessionNDM)                                                               -0.02      0.27    -0.53     0.49 1.00     4132     3296
+cor(responseBPM,sessionNDM)                                                                        0.05      0.26    -0.47     0.53 1.00     5101     2978
+cor(rollingResponseAvg.5tr.prev,sessionNDM)                                                       -0.15      0.27    -0.64     0.41 1.00     3042     3517
+cor(Intercept,session_timesession2)                                                               -0.00      0.27    -0.53     0.52 1.00     6501     3014
+cor(rollingHeartAvg.5tr,session_timesession2)                                                      0.00      0.27    -0.52     0.52 1.00     4802     3008
+cor(responseBPM,session_timesession2)                                                              0.02      0.26    -0.48     0.52 1.00     5489     2848
+cor(rollingResponseAvg.5tr.prev,session_timesession2)                                             -0.05      0.28    -0.56     0.50 1.00     4482     3188
+cor(sessionNDM,session_timesession2)                                                              -0.01      0.28    -0.54     0.53 1.00     4232     3539
+cor(Intercept,rollingHeartAvg.5tr:sessionNDM)                                                     -0.03      0.27    -0.55     0.50 1.00     8583     2848
+cor(rollingHeartAvg.5tr,rollingHeartAvg.5tr:sessionNDM)                                           -0.04      0.28    -0.57     0.50 1.00     6570     3304
+cor(responseBPM,rollingHeartAvg.5tr:sessionNDM)                                                   -0.05      0.27    -0.55     0.48 1.00     6142     2832
+cor(rollingResponseAvg.5tr.prev,rollingHeartAvg.5tr:sessionNDM)                                    0.05      0.27    -0.49     0.57 1.00     4998     3190
+cor(sessionNDM,rollingHeartAvg.5tr:sessionNDM)                                                    -0.01      0.27    -0.53     0.51 1.00     4193     3176
+cor(session_timesession2,rollingHeartAvg.5tr:sessionNDM)                                           0.00      0.28    -0.52     0.53 1.00     3333     3314
+cor(Intercept,rollingHeartAvg.5tr:session_timesession2)                                           -0.07      0.27    -0.57     0.46 1.00     6930     3225
+cor(rollingHeartAvg.5tr,rollingHeartAvg.5tr:session_timesession2)                                 -0.06      0.28    -0.57     0.49 1.00     4694     3375
+cor(responseBPM,rollingHeartAvg.5tr:session_timesession2)                                         -0.15      0.28    -0.64     0.41 1.00     4636     3191
+cor(rollingResponseAvg.5tr.prev,rollingHeartAvg.5tr:session_timesession2)                          0.07      0.27    -0.48     0.57 1.00     4860     3357
+cor(sessionNDM,rollingHeartAvg.5tr:session_timesession2)                                          -0.03      0.28    -0.57     0.52 1.00     4516     3307
+cor(session_timesession2,rollingHeartAvg.5tr:session_timesession2)                                -0.02      0.27    -0.53     0.52 1.00     3823     3460
+cor(rollingHeartAvg.5tr:sessionNDM,rollingHeartAvg.5tr:session_timesession2)                      -0.03      0.28    -0.55     0.51 1.00     3406     3338
+cor(Intercept,responseBPM:sessionNDM)                                                              0.08      0.27    -0.45     0.58 1.00     5538     3111
+cor(rollingHeartAvg.5tr,responseBPM:sessionNDM)                                                   -0.06      0.28    -0.57     0.48 1.00     4699     2971
+cor(responseBPM,responseBPM:sessionNDM)                                                            0.05      0.27    -0.48     0.55 1.00     6452     3333
+cor(rollingResponseAvg.5tr.prev,responseBPM:sessionNDM)                                           -0.04      0.27    -0.55     0.47 1.00     4709     3510
+cor(sessionNDM,responseBPM:sessionNDM)                                                             0.01      0.28    -0.52     0.55 1.00     4258     3503
+cor(session_timesession2,responseBPM:sessionNDM)                                                  -0.01      0.28    -0.54     0.52 1.00     3637     3491
+cor(rollingHeartAvg.5tr:sessionNDM,responseBPM:sessionNDM)                                         0.01      0.28    -0.51     0.55 1.00     3811     3556
+cor(rollingHeartAvg.5tr:session_timesession2,responseBPM:sessionNDM)                              -0.07      0.28    -0.59     0.49 1.00     3087     3706
+cor(Intercept,responseBPM:session_timesession2)                                                    0.01      0.26    -0.50     0.51 1.00     5373     2559
+cor(rollingHeartAvg.5tr,responseBPM:session_timesession2)                                         -0.10      0.27    -0.59     0.43 1.00     4252     3158
+cor(responseBPM,responseBPM:session_timesession2)                                                  0.15      0.25    -0.37     0.61 1.00     5674     3268
+cor(rollingResponseAvg.5tr.prev,responseBPM:session_timesession2)                                 -0.06      0.26    -0.55     0.46 1.00     4458     3439
+cor(sessionNDM,responseBPM:session_timesession2)                                                  -0.06      0.27    -0.57     0.48 1.00     2822     3405
+cor(session_timesession2,responseBPM:session_timesession2)                                        -0.02      0.27    -0.52     0.52 1.00     3947     3656
+cor(rollingHeartAvg.5tr:sessionNDM,responseBPM:session_timesession2)                              -0.05      0.28    -0.57     0.50 1.00     3299     3427
+cor(rollingHeartAvg.5tr:session_timesession2,responseBPM:session_timesession2)                    -0.02      0.27    -0.54     0.51 1.00     3307     3810
+cor(responseBPM:sessionNDM,responseBPM:session_timesession2)                                      -0.00      0.27    -0.51     0.51 1.00     2900     3532
+cor(Intercept,rollingResponseAvg.5tr.prev:sessionNDM)                                             -0.03      0.27    -0.54     0.51 1.00     5868     2757
+cor(rollingHeartAvg.5tr,rollingResponseAvg.5tr.prev:sessionNDM)                                   -0.01      0.27    -0.52     0.52 1.00     5075     3084
+cor(responseBPM,rollingResponseAvg.5tr.prev:sessionNDM)                                           -0.11      0.26    -0.59     0.40 1.00     5788     3195
+cor(rollingResponseAvg.5tr.prev,rollingResponseAvg.5tr.prev:sessionNDM)                           -0.05      0.27    -0.56     0.49 1.00     4401     3370
+cor(sessionNDM,rollingResponseAvg.5tr.prev:sessionNDM)                                            -0.01      0.27    -0.53     0.52 1.00     4277     3407
+cor(session_timesession2,rollingResponseAvg.5tr.prev:sessionNDM)                                   0.02      0.28    -0.50     0.57 1.00     3745     3656
+cor(rollingHeartAvg.5tr:sessionNDM,rollingResponseAvg.5tr.prev:sessionNDM)                        -0.02      0.28    -0.56     0.52 1.00     3416     3797
+cor(rollingHeartAvg.5tr:session_timesession2,rollingResponseAvg.5tr.prev:sessionNDM)               0.05      0.27    -0.49     0.57 1.00     3074     3711
+cor(responseBPM:sessionNDM,rollingResponseAvg.5tr.prev:sessionNDM)                                -0.07      0.28    -0.57     0.48 1.00     2992     3445
+cor(responseBPM:session_timesession2,rollingResponseAvg.5tr.prev:sessionNDM)                      -0.02      0.27    -0.54     0.49 1.00     3408     3565
+cor(Intercept,rollingResponseAvg.5tr.prev:session_timesession2)                                   -0.03      0.27    -0.53     0.50 1.00     6470     2878
+cor(rollingHeartAvg.5tr,rollingResponseAvg.5tr.prev:session_timesession2)                          0.04      0.27    -0.48     0.55 1.00     4481     3064
+cor(responseBPM,rollingResponseAvg.5tr.prev:session_timesession2)                                 -0.04      0.26    -0.55     0.48 1.00     6163     3244
+cor(rollingResponseAvg.5tr.prev,rollingResponseAvg.5tr.prev:session_timesession2)                 -0.05      0.28    -0.57     0.49 1.00     4686     3411
+cor(sessionNDM,rollingResponseAvg.5tr.prev:session_timesession2)                                  -0.00      0.28    -0.55     0.53 1.00     3799     3117
+cor(session_timesession2,rollingResponseAvg.5tr.prev:session_timesession2)                         0.01      0.28    -0.52     0.56 1.00     3831     3563
+cor(rollingHeartAvg.5tr:sessionNDM,rollingResponseAvg.5tr.prev:session_timesession2)               0.05      0.28    -0.50     0.57 1.00     3201     3205
+cor(rollingHeartAvg.5tr:session_timesession2,rollingResponseAvg.5tr.prev:session_timesession2)    -0.01      0.28    -0.54     0.51 1.00     2892     3230
+cor(responseBPM:sessionNDM,rollingResponseAvg.5tr.prev:session_timesession2)                       0.00      0.27    -0.51     0.52 1.00     3286     3271
+cor(responseBPM:session_timesession2,rollingResponseAvg.5tr.prev:session_timesession2)            -0.07      0.28    -0.58     0.47 1.00     3207     3371
+cor(rollingResponseAvg.5tr.prev:sessionNDM,rollingResponseAvg.5tr.prev:session_timesession2)       0.03      0.28    -0.51     0.55 1.00     2707     3322
+
+Regression Coefficients:
+                                                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept                                            0.11      0.28    -0.43     0.68 1.00     3010     3056
+rollingHeartAvg.5tr                                 -0.28      0.29    -0.88     0.27 1.00     3544     3263
+responseBPM                                          3.10      0.33     2.47     3.77 1.00     3747     3171
+rollingResponseAvg.5tr.prev                         -0.78      0.29    -1.39    -0.23 1.00     3015     3087
+sessionNDM                                           0.26      0.31    -0.33     0.90 1.00     4152     2952
+session_timesession2                                -0.10      0.32    -0.73     0.51 1.00     2809     2687
+rollingHeartAvg.5tr:sessionNDM                      -0.23      0.34    -0.89     0.44 1.00     3543     2870
+rollingHeartAvg.5tr:session_timesession2            -0.07      0.34    -0.74     0.59 1.00     4283     3427
+responseBPM:sessionNDM                               0.03      0.33    -0.62     0.69 1.00     4544     3394
+responseBPM:session_timesession2                     0.84      0.36     0.20     1.60 1.00     4086     3300
+rollingResponseAvg.5tr.prev:sessionNDM               0.00      0.33    -0.65     0.64 1.00     3776     3249
+rollingResponseAvg.5tr.prev:session_timesession2    -0.30      0.33    -0.94     0.35 1.00     4356     3092
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).

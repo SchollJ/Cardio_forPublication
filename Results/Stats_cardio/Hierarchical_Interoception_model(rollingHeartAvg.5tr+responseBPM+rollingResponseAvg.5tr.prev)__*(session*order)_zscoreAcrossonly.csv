@@ -1,0 +1,17 @@
+"","Estimate","Est.Error","Q2.5","Q97.5"
+"Intercept",-0.12,0.35,-0.81,0.57
+"rollingHeartAvg.5tr",-0.13,0.35,-0.82,0.54
+"responseBPM",3.31,0.41,2.52,4.15
+"rollingResponseAvg.5tr.prev",-0.7,0.32,-1.35,-0.09
+"sessionNDM",0.07,0.38,-0.69,0.79
+"orderNDM.first",0.41,0.5,-0.57,1.46
+"sessionNDM:orderNDM.first",0.32,0.56,-0.73,1.48
+"rollingHeartAvg.5tr:sessionNDM",-0.19,0.42,-0.98,0.66
+"rollingHeartAvg.5tr:orderNDM.first",-0.33,0.5,-1.35,0.63
+"responseBPM:sessionNDM",0.73,0.42,-0.02,1.58
+"responseBPM:orderNDM.first",0.17,0.62,-1.01,1.42
+"rollingResponseAvg.5tr.prev:sessionNDM",-0.27,0.43,-1.13,0.57
+"rollingResponseAvg.5tr.prev:orderNDM.first",-0.59,0.44,-1.42,0.31
+"rollingHeartAvg.5tr:sessionNDM:orderNDM.first",-0.01,0.58,-1.18,1.08
+"responseBPM:sessionNDM:orderNDM.first",-1.15,0.56,-2.31,-0.11
+"rollingResponseAvg.5tr.prev:sessionNDM:orderNDM.first",0.59,0.58,-0.58,1.69
