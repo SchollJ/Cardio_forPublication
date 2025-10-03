@@ -1,0 +1,10 @@
+"","Estimate","Est.Error","Q2.5","Q97.5"
+"Intercept",0.27,0.17,-0.06,0.62
+"responseBPM",2.37,0.22,1.97,2.82
+"rollingResponseAvg.5tr.prev",-0.06,0.12,-0.29,0.18
+"sessionNDM",0.02,0.14,-0.25,0.31
+"orderNDM.first",0.05,0.24,-0.42,0.53
+"responseBPM:sessionNDM",0.02,0.19,-0.34,0.41
+"responseBPM:orderNDM.first",-0.15,0.29,-0.73,0.4
+"rollingResponseAvg.5tr.prev:sessionNDM",-0.04,0.14,-0.32,0.24
+"rollingResponseAvg.5tr.prev:orderNDM.first",-0.23,0.15,-0.53,0.07

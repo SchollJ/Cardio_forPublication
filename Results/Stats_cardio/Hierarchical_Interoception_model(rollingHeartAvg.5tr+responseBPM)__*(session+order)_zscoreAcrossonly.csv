@@ -1,0 +1,10 @@
+"","Estimate","Est.Error","Q2.5","Q97.5"
+"Intercept",-0.35,0.54,-1.43,0.71
+"rollingHeartAvg.5tr",-0.23,0.4,-1.03,0.55
+"responseBPM",3.46,0.43,2.62,4.34
+"sessionNDM",0.24,0.37,-0.47,1
+"orderNDM.first",1,0.75,-0.45,2.52
+"rollingHeartAvg.5tr:sessionNDM",-0.35,0.36,-1.09,0.36
+"rollingHeartAvg.5tr:orderNDM.first",-0.63,0.56,-1.76,0.45
+"responseBPM:sessionNDM",0.18,0.28,-0.35,0.78
+"responseBPM:orderNDM.first",-0.5,0.6,-1.68,0.71

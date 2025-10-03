@@ -44,7 +44,7 @@ rm(list=ls())
 paths=list(base.path='/Users/jacquelinescholl/Documents/Experiments/Tim_Palmer/Cardio_forPublication')
 #paths=list(base.path='C:/Users/tpalmer4/OneDrive - University of Plymouth/Meditation/Lyon/Survey and Cardioception Paper/Cardio_publication/Cardio_publication')
 paths$figures=file.path(paths$base.path,'Results','Figures_cardio')
-paths$stats=file.path(paths$base.path,'Results','Stats_cardio')
+paths$stats=file.path(paths$base.path,'Results','Stats_cardio_results_fullerCode')
 
 
 library(tidyverse)
@@ -1316,7 +1316,8 @@ cardio.legrand.this = cardio.legrand %>% dplyr::group_by(ID,Modality)  %>%
                 DV_ResponseMinAvg5tr = responseBPM-rollingResponseAvg.5tr.prev,
                 rollingHeartAvg.5tr=rollapply(listenBPM,5,mean,align='right',fill=NA),# to use in model: previous as the other one includes the current trial
                 DV_ResponseMinAvgListen5tr=responseBPM-rollingHeartAvg.5tr,
-                Decision = dplyr::recode(Decision,'More'=1,'Less'=0)) %>% dplyr::ungroup() 
+                Decision = dplyr::recode(Decision,'More'=1,'Less'=0)) %>% 
+  dplyr::ungroup() 
 # run regressions
 results.indivModalities.legrand=data.frame()
 results.logLiks.glms.legrand = data.frame()
@@ -1542,7 +1543,7 @@ ggexport(figure,filename=file.path(paths$figures,'Legrand_RegressionWeights.tiff
 Hierarchical regression
 ```{r}
 my.prior=c(prior(normal(0,3),class='b')) 
-df= cardio.legrand.this %>% dplyr::filter(Modality=='Intero') %>% dplyr::mutate_if(is.numeric,scale)
+df= cardio.legrand.this %>% dplyr::filter(Modality=='Intero') %>% dplyr::group_by(ID) %>% dplyr::mutate_at(c('responseBPM','listenBPM','rollingHeartAvg.5tr','rollingResponseAvg.5tr.prev'),scale)
 fit.legrand.listenBPM.intero = brm(Decision~ (responseBPM + listenBPM) + (responseBPM+ listenBPM|ID) ,
           data=df,family=bernoulli(link='logit'),prior=my.prior)
 fit.legrand.listenBPM5trAvg.intero = brm(Decision~ (responseBPM + rollingHeartAvg.5tr) + (responseBPM+ rollingHeartAvg.5tr|ID) ,
@@ -1553,7 +1554,7 @@ fit.legrand.soundBPM5trAvg.hear5travg.intero = brm(Decision~ (responseBPM + roll
                                                              (responseBPM+  rollingResponseAvg.5tr.prev+  rollingHeartAvg.5tr|ID) ,
           data=df,family=bernoulli(link='logit'),prior=my.prior)
 
-sink(file.path(paths$stats,'Legrand_HierarchicalRegression_Interoception.txt'))
+sink(file.path(paths$stats,'Legrand_HierarchicalRegression_Interoception_zscoredWithin.txt'))
 print(summary(fit.legrand.listenBPM.intero))
 print(summary(fit.legrand.listenBPM5trAvg.intero))
 print(summary(fit.legrand.soundBPM5trAvg.intero))

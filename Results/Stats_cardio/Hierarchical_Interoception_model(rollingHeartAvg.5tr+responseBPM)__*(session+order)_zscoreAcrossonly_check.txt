@@ -1,0 +1,47 @@
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: Decision.num ~ (rollingHeartAvg.5tr + responseBPM) * (session + order) + ((rollingHeartAvg.5tr + responseBPM) * session | ID) 
+   Data: df (Number of observations: 2195) 
+  Draws: 4 chains, each with iter = 8000; warmup = 4000; thin = 1;
+         total post-warmup draws = 16000
+
+Multilevel Hyperparameters:
+~ID (Number of levels: 24) 
+                                                           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                                                  1.82      0.40     1.15     2.72 1.00     6986    10235
+sd(rollingHeartAvg.5tr)                                        0.71      0.36     0.07     1.46 1.00     4363     4757
+sd(responseBPM)                                                1.33      0.28     0.86     1.96 1.00    12280    12996
+sd(sessionNDM)                                                 1.37      0.34     0.80     2.14 1.00     9604    11248
+sd(rollingHeartAvg.5tr:sessionNDM)                             0.76      0.46     0.05     1.77 1.00     4066     7520
+sd(responseBPM:sessionNDM)                                     0.59      0.32     0.05     1.28 1.00     6924     7747
+cor(Intercept,rollingHeartAvg.5tr)                            -0.03      0.32    -0.61     0.60 1.00    13853    11073
+cor(Intercept,responseBPM)                                    -0.03      0.22    -0.46     0.40 1.00    13935    12828
+cor(rollingHeartAvg.5tr,responseBPM)                          -0.40      0.30    -0.86     0.31 1.00     3339     3656
+cor(Intercept,sessionNDM)                                     -0.11      0.26    -0.58     0.42 1.00    11467    11256
+cor(rollingHeartAvg.5tr,sessionNDM)                           -0.16      0.34    -0.75     0.54 1.00     3283     6495
+cor(responseBPM,sessionNDM)                                    0.12      0.25    -0.37     0.58 1.00    11305    13831
+cor(Intercept,rollingHeartAvg.5tr:sessionNDM)                 -0.14      0.33    -0.74     0.54 1.00    19536    13073
+cor(rollingHeartAvg.5tr,rollingHeartAvg.5tr:sessionNDM)       -0.03      0.36    -0.69     0.66 1.00     9587    12034
+cor(responseBPM,rollingHeartAvg.5tr:sessionNDM)               -0.15      0.33    -0.73     0.52 1.00    13661    11932
+cor(sessionNDM,rollingHeartAvg.5tr:sessionNDM)                -0.18      0.35    -0.77     0.54 1.00    12374    12387
+cor(Intercept,responseBPM:sessionNDM)                          0.33      0.30    -0.33     0.82 1.00    16526    12775
+cor(rollingHeartAvg.5tr,responseBPM:sessionNDM)               -0.06      0.36    -0.72     0.64 1.00    10503    12120
+cor(responseBPM,responseBPM:sessionNDM)                        0.03      0.33    -0.59     0.64 1.00    18325    14072
+cor(sessionNDM,responseBPM:sessionNDM)                        -0.20      0.33    -0.76     0.48 1.00    15270    13215
+cor(rollingHeartAvg.5tr:sessionNDM,responseBPM:sessionNDM)     0.03      0.36    -0.66     0.69 1.00    12532    13368
+
+Regression Coefficients:
+                                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept                             -0.35      0.54    -1.43     0.71 1.00     6652     8994
+rollingHeartAvg.5tr                   -0.23      0.40    -1.03     0.55 1.00    11479    11405
+responseBPM                            3.46      0.43     2.62     4.34 1.00    10943    10872
+sessionNDM                             0.24      0.37    -0.47     1.00 1.00    13121    10711
+orderNDM.first                         1.00      0.75    -0.45     2.52 1.00     7291     9658
+rollingHeartAvg.5tr:sessionNDM        -0.35      0.36    -1.09     0.36 1.00    14186    12492
+rollingHeartAvg.5tr:orderNDM.first    -0.63      0.56    -1.76     0.45 1.00    13077    11604
+responseBPM:sessionNDM                 0.18      0.28    -0.35     0.78 1.00    16140    11351
+responseBPM:orderNDM.first            -0.50      0.60    -1.68     0.71 1.00    10952    11366
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).

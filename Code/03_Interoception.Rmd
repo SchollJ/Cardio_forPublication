@@ -86,8 +86,12 @@ cardio.unfiltered = left_join(cardio.unfiltered,med.data,by='ID') %>% # checked,
                 listen.responseBPM.mean= (listenBPM+responseBPM)/2,
                 rollingHeartAvg.5tr=rollapply(listenBPM,5,mean,align='right',fill=NA),
                 rollingResponseAvg.5tr=rollapply(responseBPM,5,mean,align='right',fill=NA),
-                rollingResponseAvg.5tr.prev= lag(rollingResponseAvg.5tr)) %>%
-  dplyr::select(-rollingResponseAvg.5tr) %>%
+                rollingResponseAvg.5tr.prev= lag(rollingResponseAvg.5tr),
+                rollingResponseAvg.1tr.prev = lag(responseBPM),
+                rollingResponseAvg.3tr=rollapply(responseBPM,3,mean,align='right',fill=NA),
+                rollingResponseAvg.3tr.prev= lag(rollingResponseAvg.3tr)) %>%
+  
+  dplyr::select(-rollingResponseAvg.5tr,-rollingResponseAvg.3tr) %>%
   dplyr::ungroup() 
 # to add: same for response BPM (but not including current trial)
   # slightly more complicated than for choice to compute easiness based on Response only! two choices: some arbitrary number or the average of what they heard
@@ -222,7 +226,7 @@ results.logLiks = data.frame()
 
 cardio.scaled=cardio %>% dplyr::ungroup() %>%
   dplyr::mutate_at(vars(c('DV_ResponseMinListen','easiness_ResponseMinListen.abs','DecisionRT','Confidence',
-                          'listenBPM','listen.responseBPM.mean','responseBPM')),scale)
+                          'listenBPM','listen.responseBPM.mean','responseBPM','rollingHeartAvg.5tr','rollingResponseAvg.5tr.prev')),scale)
 for (isub in unique(cardio$ID)){
   dft=cardio.scaled %>% dplyr::filter(ID==isub) %>%
     dplyr::mutate(Decision = dplyr::recode(Decision,'More'=1,'Less'=0))
@@ -237,7 +241,10 @@ for (isub in unique(cardio$ID)){
       glms$dec = glm(Decision~ DV_ResponseMinListen,data=df,family='binomial')
       # Control analyses
       glms$dec.withAvgListenResponseBPM = glm(Decision~ DV_ResponseMinListen+ listen.responseBPM.mean,data=df,family='binomial')
-      glms$dec.listenRespBPMsep = glm(Decision~ listenBPM+responseBPM,data=df,family='binomial')
+      glms$dec.listenRespBPMsep =         glm(Decision~ listenBPM+responseBPM,data=df,family='binomial')
+      glms$dec.soundHeart5trPastsound5tr= glm(Decision~ responseBPM+rollingHeartAvg.5tr+rollingResponseAvg.5tr.prev,data=df,family='binomial')
+      glms$dec.soundPastsound5tr=         glm(Decision~ responseBPM+rollingResponseAvg.5tr.prev,data=df,family='binomial')
+      glms$dec.soundHeart5tr=             glm(Decision~ responseBPM+rollingHeartAvg.5tr,data=df,family='binomial')
      
       # We're using NA omit to make sure there is the same number of data points for each (this should anyway be the case, it wasnt before when we had yet another model - that did not perform well - that computed DV comparing sound minus average sound of last 5 or so trials)
       df.comparison= df.nonScaled %>% dplyr::select(Decision,DV_ResponseMinListen,responseBPM,easiness_ResponseMinListen.abs) %>% na.omit()
@@ -789,11 +796,19 @@ write.csv(main,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_mainT
 main.table1= main %>% dplyr::filter(analysis.type %in% c('dec','conf')) %>% 
   dplyr::select(-c(`CDM&NDM (p,one-sample)`,`CDM minNDM, ctr HR mean (p)`,`CDM minNDM, ctr HR sd (p)`, `CDM (estimate)`,`NDM (estimate)`,`CDM&NDM (estimate)`,`CDM (p, one-sample)`,`NDM (p, one-sample)`))
 
+
 main.table.control = main %>% dplyr::filter(analysis.type %in% c('dec.withAvgListenResponseBPM','dec.listenRespBPMsep')) %>%
   dplyr::select(-c(`CDM&NDM (p,one-sample)`,`CDM&NDM (estimate)`,`CDM min NDM, mean(s.e.)`,`Order [NDM first], mean(s.e.)`,`CDM (p, one-sample)`,`NDM (p, one-sample)`)) 
 
+new.suppl.withoutConf = main %>% dplyr::filter(analysis.type %in% c('dec','dec.listenRespBPMsep','dec.soundPastsound5tr','dec.soundHeart5trPastsound5tr','dec.soundHeart5tr')) %>%
+  relocate(Modality,analysis.type,Subject.level.regression.weight,`CDM&NDM (estimate)`,`CDM&NDM (p,one-sample)`,`CDM min NDM, mean(s.e.)`,`CDM min NDM (p)`,`CDM minNDM, ctr HR mean (p)`,`CDM minNDM, ctr HR sd (p)`) %>%
+  dplyr::arrange(desc(Modality),analysis.type)
+  
+
 write.csv(main.table1,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_mainText_newTable.csv'))
 write.csv(main.table.control,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_mainText_controlAnalyses.csv'))
+write.csv(new.suppl.withoutConf,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_supplements_noConf.csv'))
+
 
 
 ```
@@ -835,8 +850,9 @@ df.scaled.across= cardio %>% dplyr::filter(Modality=='Intero') %>%
                                          session=='NDM' &order=='NDM.first' ~ 'session1'),
                 Decision.num = case_when(Decision=='More' ~1,
                                          Decision=='Less' ~ 0)) %>%
-  dplyr::select(ID,Decision,Decision.num,DV_ResponseMinListen,session,session_time,listenBPM,responseBPM,listen.responseBPM.mean,order, rollingHeartAvg.5tr,rollingResponseAvg.5tr.prev) %>%ungroup() %>%
-  dplyr::mutate_at(c('DV_ResponseMinListen','listenBPM','responseBPM','listen.responseBPM.mean','rollingHeartAvg.5tr','rollingResponseAvg.5tr.prev'),scale)
+  dplyr::select(ID,Decision,Decision.num,DV_ResponseMinListen,session,session_time,listenBPM,responseBPM,listen.responseBPM.mean,order, rollingHeartAvg.5tr,rollingResponseAvg.5tr.prev,rollingResponseAvg.1tr.prev,rollingResponseAvg.3tr.prev) %>%
+  ungroup() %>%
+  dplyr::mutate_at(c('DV_ResponseMinListen','listenBPM','responseBPM','listen.responseBPM.mean','rollingHeartAvg.5tr','rollingResponseAvg.5tr.prev','rollingResponseAvg.1tr.prev','rollingResponseAvg.3tr.prev'),scale)
 df.scaled.within= cardio %>% dplyr::filter(Modality=='Intero') %>%
   dplyr::mutate(session_time = case_when(session=='CDM' &order=='CDM.first' ~ 'session1',
                                          session=='CDM' &order=='NDM.first' ~ 'session2',
@@ -844,29 +860,34 @@ df.scaled.within= cardio %>% dplyr::filter(Modality=='Intero') %>%
                                          session=='NDM' &order=='NDM.first' ~ 'session1'),
                 Decision.num = case_when(Decision=='More' ~1,
                                          Decision=='Less' ~ 0)) %>%
-  dplyr::select(ID,Decision,Decision.num,DV_ResponseMinListen,session,session_time,listenBPM,responseBPM,listen.responseBPM.mean,order, rollingHeartAvg.5tr,rollingResponseAvg.5tr.prev) %>%
+  dplyr::select(ID,Decision,Decision.num,DV_ResponseMinListen,session,session_time,listenBPM,responseBPM,listen.responseBPM.mean,order, rollingHeartAvg.5tr,rollingResponseAvg.5tr.prev,rollingResponseAvg.1tr.prev,rollingResponseAvg.3tr.prev) %>%
   group_by(ID,session) %>%
-  dplyr::mutate_at(c('DV_ResponseMinListen','listenBPM','responseBPM','listen.responseBPM.mean','rollingHeartAvg.5tr','rollingResponseAvg.5tr.prev'),scale)
+  dplyr::mutate_at(c('DV_ResponseMinListen','listenBPM','responseBPM','listen.responseBPM.mean','rollingHeartAvg.5tr','rollingResponseAvg.5tr.prev','rollingResponseAvg.1tr.prev','rollingResponseAvg.3tr.prev'),scale)
 
 my.prior=c(prior(normal(0,3),class='b')) 
 
 formulas.basic= c('(listenBPM+responseBPM)',
-                  '(DV_ResponseMinListen+listen.responseBPM.mean)',
-                  'DV_ResponseMinListen',
+                  #'(DV_ResponseMinListen+listen.responseBPM.mean)',
+                  #'DV_ResponseMinListen',
                   '(rollingHeartAvg.5tr+responseBPM)',
-                  '(rollingHeartAvg.5tr+responseBPM+rollingResponseAvg.5tr.prev)')
+                  '(rollingHeartAvg.5tr+responseBPM+rollingResponseAvg.5tr.prev)',
+                  '(rollingHeartAvg.5tr+responseBPM+rollingResponseAvg.1tr.prev)', # to check whether 5 trials gets close to the average
+                  '(rollingHeartAvg.5tr+responseBPM+rollingResponseAvg.3tr.prev)',
+                  '(responseBPM+rollingResponseAvg.5tr.prev)')
 formulas.conditions = c('*(session+session_time)',
-                        '*(session*session_time)',
-                        '*(session*order)')
+                        '*(session+order)')
+ # '*(session*session_time)',
+                        # '*(session*order)',
+
 model.count=0;
-for (ibasic in formulas.basic[c(5,4,3,2,1)]){
+for (ibasic in formulas.basic){
   for (icond in formulas.conditions){
     for (izscore in c('zscoreWithin','zscoreAcrossonly')){
     model.count=model.count+1
     this.file=file.path(paths$stats,paste0('Hierarchical_Interoception_model',ibasic,'__',icond,'_',izscore,'.csv')) #model.count,'.csv'))
     this.file.long=file.path(paths$stats,paste0('Hierarchical_Interoception_model',ibasic,'__',icond,'_',izscore,'_check.txt'))
     if (!file.exists(this.file)| overwrite==T){
-      if (icond=='*(session*order)') {
+      if (icond=='*(session+order)') {
         this.formula= paste0('Decision.num ~',ibasic,icond,'+ (',ibasic,'*session|ID)')
       } else{
         this.formula= paste0('Decision.num ~',ibasic,icond,'+ (',ibasic,icond,'|ID)')
@@ -878,8 +899,9 @@ for (ibasic in formulas.basic[c(5,4,3,2,1)]){
       } else{
         df= df.scaled.across
       }
+      print(paste('Fitting basic',ibasic,'condition',icond,'zscore',izscore))
       fit = brm(this.formula,
-                data=df,family=bernoulli(link='logit'),prior=my.prior)
+                data=df,family=bernoulli(link='logit'),prior=my.prior,iter=8000,control=list(adapt_delta =0.9))
       write.csv(as.data.frame(fixef(fit)) %>% dplyr::mutate_if(is.numeric,~round(.,2)),this.file)
       sink(this.file.long)
       print(summary(fit))
@@ -919,7 +941,53 @@ t=full.hier.res %>% dplyr::mutate(X=stringr::str_replace_all(X,'session_timesess
                                   X=stringr::str_replace_all(X,'listenBPM','Heart'))
 write.csv(t,file=file.path(paths$stats,'Hiearchical_Interoception_allModels.csv'))
 
+# shorter list for publication
+t=full.hier.res %>% dplyr::filter(stringr::str_detect(model,'(listenBPM|rollingHeartAvg.5tr)') &stringr::str_detect(model,'zscoreWithin')) %>% # &!stringr::str_detect(model,'(rollingHeartAvg.5tr\\+responseBPM)')) %>%
+  dplyr::mutate(sessionCoding = case_when(stringr::str_detect(model,'session\\*session_time') ~ 'session*session_time',
+                                          stringr::str_detect(model,'session\\+session_time') ~ 'session+session_time',
+                                          stringr::str_detect(model,'session\\*order') ~ 'session*order'),
+                sessionCoding=factor(sessionCoding,ordered=T,levels=c('session+session_time','session*session_time','session*order')),
+                model.short = case_when(stringr::str_detect(model,'listenBPM')~ 'listenBPM+responseBPM',
+                                        stringr::str_detect(model,'rollingHeartAvg.5tr\\+responseBPM\\+rollingResponseAvg.5tr.prev') ~ 'rollingHeartAvg.5tr+responseBPM+rollingResponseAvg.5tr.prev',
+                                        stringr::str_detect(model,'rollingHeartAvg.5tr\\+responseBPM') ~ 'rollingHeartAvg.5tr+responseBPM'),
+                model.short=factor(model.short,ordered=T,levels=c('listenBPM+responseBPM','rollingHeartAvg.5tr+responseBPM+rollingResponseAvg.5tr.prev','rollingHeartAvg.5tr+responseBPM'))) %>%
+  dplyr::arrange(model.short,sessionCoding)%>% dplyr::mutate(X=stringr::str_replace_all(X,'session_timesession2','Time'),
+                                  X=stringr::str_replace_all(X,'sessionNDM','Intervention'),
+                                  X=stringr::str_replace_all(X,'orderNDM.first','Order'),
+                                  X=stringr::str_replace_all(X,'DV_ResponseMinListen','Sound-Heart'),
+                                  X=stringr::str_replace_all(X,'listen.responseBPM.mean','Sound+Heart'),
+                                  X=stringr::str_replace_all(X,'responseBPM','Sound'),
+                                  X=stringr::str_replace_all(X,'listenBPM','Heart'),
+                                  X=stringr::str_replace_all(X,'rollingHeartAvg.5tr','Heart (5tr)'),
+                                  X=stringr::str_replace_all(X,'rollingResponseAvg.5tr.prev','Sound (5tr prev)'))
 
+
+inspect.avgHeart = full.hier.res %>% 
+  dplyr::filter(!stringr::str_detect(X,'Intercept|order|timesession') )%>%
+  dplyr::mutate(sessionCoding = case_when(stringr::str_detect(model,'session\\+session_time') ~ 'session+session_time',
+                                          stringr::str_detect(model,'session\\+order') ~ 'session+order'),
+                sessionCoding=factor(sessionCoding,ordered=T,levels=c('session+session_time','session+order')),
+                model.short = case_when(stringr::str_detect(model,'listenBPM')~ 'listenBPM+responseBPM',
+                                        stringr::str_detect(model,'rollingHeartAvg.5tr\\+responseBPM\\+rollingResponseAvg.5tr.prev') ~ 'rollingHeartAvg.5tr+responseBPM+rollingResponseAvg.5tr.prev',
+                                        stringr::str_detect(model,'rollingHeartAvg.5tr\\+responseBPM') ~ 'rollingHeartAvg.5tr+responseBPM',
+                                        stringr::str_detect(model,'responseBPM\\+rollingResponseAvg.5tr.prev') ~ 'responseBPM+rollingResponseAvg.5tr.prev'),
+                model.short=factor(model.short,ordered=T,levels=c('listenBPM+responseBPM','rollingHeartAvg.5tr+responseBPM+rollingResponseAvg.5tr.prev','rollingHeartAvg.5tr+responseBPM','responseBPM+rollingResponseAvg.5tr.prev')),
+                zscore= case_when(stringr::str_detect(model,'zscoreAcross') ~ 'zscoreAcross',
+                                  stringr::str_detect(model,'zscoreWithin') ~ 'zscoreWithin'))%>%
+  dplyr::arrange(model.short,X,zscore,sessionCoding)%>% 
+  dplyr::mutate(X=stringr::str_replace_all(X,'session_timesession2','Time'),
+                                  X=stringr::str_replace_all(X,'sessionNDM','Intervention'),
+                                  X=stringr::str_replace_all(X,'orderNDM.first','Order'),
+                                  X=stringr::str_replace_all(X,'DV_ResponseMinListen','Sound-Heart'),
+                                  X=stringr::str_replace_all(X,'listen.responseBPM.mean','Sound+Heart'),
+                                  X=stringr::str_replace_all(X,'responseBPM','Sound'),
+                                  X=stringr::str_replace_all(X,'listenBPM','Heart'),
+                                  X=stringr::str_replace_all(X,'rollingHeartAvg.5tr','Heart (5tr)'),
+                                  X=stringr::str_replace_all(X,'rollingResponseAvg.5tr.prev','Sound (5tr prev)'),
+                X=factor(X,ordered=T, levels=c('Heart','Heart (5tr)','Sound','Sound (5tr prev)','Intervention','Heart:Intervention','Heart (5tr):Intervention',
+                'Sound:Intervention','Sound (5tr prev):Intervention'))) %>%
+  dplyr::arrange(X)
+write.csv(inspect.avgHeart,file=file.path(paths$stats,'Hiearchical_Interoception_tableForSupplements.csv'))
 ```
 
 ## Figure:conditional effects plot of model with heart rate and sound separately
@@ -996,6 +1064,14 @@ sink()
 We compare:
 - log likelihood summed
 - count better model
+
+Results for summedLogLiks:
+ session Modality logLik.listenBeep.sum logLik.responseBeepOnly
+  <chr>   <chr>                    <dbl>                   <dbl>
+1 CDM     Extero                   -537.                   -739.
+2 CDM     Intero                   -485.                   -451.
+3 NDM     Extero                   -573.                   -748.
+4 NDM     Intero                   -475.                   -442.
 ```{r}
 summedLogLiks=results.logLiks %>% group_by(session,Modality) %>%
   dplyr::summarize(logLik.listenBeep.sum=sum(logLik.listenBeep),
@@ -1028,6 +1104,9 @@ t.summary.listenVsNothing.bySessionNumber = t %>%
   dplyr::summarize(count.best.model=n()) %>% dplyr::arrange(Modality,sessionNumber)
 write.csv(t.summary.listenVsNothing.bySessionNumber,file=file.path(paths$stats,'logLikelihood_listenVsNothing_bySession.csv'))
 write.csv(t.summary.listenVsNothing,file=file.path(paths$stats,'logLikelihood_listenVsNothing.csv'))
+
+
+
 
 ```
 
