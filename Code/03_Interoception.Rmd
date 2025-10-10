@@ -294,6 +294,23 @@ write.csv(t %>% dplyr::filter(rowname=="DV_ResponseMinListen"),file=file.path(pa
 write.csv(t %>% dplyr::filter(rowname=="Intercept")%>%
             dplyr::mutate(Intero_absCDM_m_absNDM=abs(CDM_Intero)-abs(NDM_Intero)),
           file=file.path(paths$stats,'Interoception_Regression_withinSubjRegressio_dec_absIntercept.csv'))
+# for JASP: heart rate only 
+t= results.indivModalities %>% dplyr::filter(regression=='dec.soundHeart5tr') %>% dplyr::select(-`Std. Error`,-`z value`,-`t value`,-`Pr(>|t|)`) %>%
+    pivot_wider(.,id_cols=c('ID','rowname','order'),values_from='Estimate',names_from=c('session','Modality')) %>% #'Age','Sex',
+    dplyr::mutate(Extero_CDMmNDM = CDM_Extero-NDM_Extero,
+                  Intero_CDMmNDM = CDM_Intero-NDM_Intero,
+                  Extero_CDMplusNDM = CDM_Extero+NDM_Extero,
+                  Intero_CDMplusNDM = CDM_Intero+NDM_Intero)
+write.csv(t %>% dplyr::filter(rowname=="rollingHeartAvg.5tr"),file=file.path(paths$stats,'Interoception_Regression_withinSubjRegressio_decSoundHeart5tr_heartRateReg.csv'))
+
+
+t= results.indivModalities %>% dplyr::filter(regression=='dec.listenRespBPMsep') %>% dplyr::select(-`Std. Error`,-`z value`,-`t value`,-`Pr(>|t|)`) %>%
+    pivot_wider(.,id_cols=c('ID','rowname','order'),values_from='Estimate',names_from=c('session','Modality')) %>% #'Age','Sex',
+    dplyr::mutate(Extero_CDMmNDM = CDM_Extero-NDM_Extero,
+                  Intero_CDMmNDM = CDM_Intero-NDM_Intero,
+                  Extero_CDMplusNDM = CDM_Extero+NDM_Extero,
+                  Intero_CDMplusNDM = CDM_Intero+NDM_Intero)
+write.csv(t %>% dplyr::filter(rowname=="listenBPM"),file=file.path(paths$stats,'Interoception_Regression_withinSubjRegressio_decListenRespBPMsep_listenBPMieHeart.csv'))
 
 ```
 
@@ -964,6 +981,7 @@ t=full.hier.res %>% dplyr::filter(stringr::str_detect(model,'(listenBPM|rollingH
 
 inspect.avgHeart = full.hier.res %>% 
   dplyr::filter(!stringr::str_detect(X,'Intercept|order|timesession') )%>%
+  dplyr::filter(!stringr::str_detect(model,'rollingResponseAvg.1tr.prev|rollingResponseAvg.3tr.prev') ) %>%
   dplyr::mutate(sessionCoding = case_when(stringr::str_detect(model,'session\\+session_time') ~ 'session+session_time',
                                           stringr::str_detect(model,'session\\+order') ~ 'session+order'),
                 sessionCoding=factor(sessionCoding,ordered=T,levels=c('session+session_time','session+order')),
@@ -988,6 +1006,8 @@ inspect.avgHeart = full.hier.res %>%
                 'Sound:Intervention','Sound (5tr prev):Intervention'))) %>%
   dplyr::arrange(X)
 write.csv(inspect.avgHeart,file=file.path(paths$stats,'Hiearchical_Interoception_tableForSupplements.csv'))
+
+# interaction terms
 ```
 
 ## Figure:conditional effects plot of model with heart rate and sound separately
@@ -1270,6 +1290,14 @@ ggexport(figure,filename=file.path(paths$figures,'Legrand_RegressionWeights.tiff
 
 
 
+# for JASP: heart rate only 
+t= results.indivModalities %>% dplyr::filter(regression=='dec.soundHeart5tr') %>% dplyr::select(-`Std. Error`,-`z value`,-`t value`,-`Pr(>|t|)`) %>%
+    pivot_wider(.,id_cols=c('ID','rowname','order'),values_from='Estimate',names_from=c('session','Modality')) %>% #'Age','Sex',
+    dplyr::mutate(Extero_CDMmNDM = CDM_Extero-NDM_Extero,
+                  Intero_CDMmNDM = CDM_Intero-NDM_Intero,
+                  Extero_CDMplusNDM = CDM_Extero+NDM_Extero,
+                  Intero_CDMplusNDM = CDM_Intero+NDM_Intero)
+write.csv(t %>% dplyr::filter(rowname=="rollingHeartAvg.5tr"),file=file.path(paths$stats,'Interoception_Regression_withinSubjRegressio_decSoundHeart5tr_heartRateReg_legrand.csv'))
 
 ```
 
