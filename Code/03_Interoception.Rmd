@@ -7,7 +7,7 @@ editor_options:
 
 Jacqueline Scholl 2024, based on Legrand 2022 (and their R code)
 
-Note: to preprocess the heart rate signal, i.e. look for outliers, we used the systole package from LEgrand and Allen (2022) in Python and upload the results here.
+Note: to preprocess the heart rate signal, i.e. look for outliers, we used the systole package from Legrand and Allen (2022) in Python and upload the results here.
 
 # Packages, loading
 Load the raw data, but also the pre-processed data, so that we can compare our and their results
@@ -106,7 +106,7 @@ cardio= cardio.unfiltered %>%
 folders=list.files(file.path(paths$base.path,'Data','CardioceptionPaper-main','data','raw','HRD'),full.names = T)
 cardio.legrand.unfiltered= data.frame()
 for (ifold in folders){
-  ID=stringr::str_split(ifold,'/')[[1]][14]
+  ID=stringr::str_split(ifold,'/')[[1]][length(stringr::str_split(ifold,'/')[[1]])]
   cardio.legrand.unfiltered=rbind(cardio.legrand.unfiltered,
                                   read.csv(file.path(ifold,'filtered.txt')) %>% dplyr::mutate(ID=ID))
 }
@@ -1032,8 +1032,8 @@ fit=brm(Decision.num ~ (heartBPM + soundBPM)*(session+session_time) + ((heartBPM
 p=conditional_effects(fit,effects=c('soundBPM','heartBPM'))
 
 
-plot.sound=plot(p,points = F, plot = F)[[1]]+theme_bw()+ylab('Probability judge sound faster')+xlab('Sound rate (BPM')
-plot.heart=plot(p,points = F, plot = F)[[2]]+theme_bw()+ylab('Probability judge sound faster')+xlab('Heart rate (BPM')
+plot.sound=plot(p,points = F, plot = F)[[1]]+theme_bw()+ylab('Probability judge sound faster')+xlab('Sound rate (BPM)')
+plot.heart=plot(p,points = F, plot = F)[[2]]+theme_bw()+ylab('Probability judge sound faster')+xlab('Heart rate (BPM)')
 plots.sound_heartRate=ggarrange(plot.sound,plot.heart,nrow=1)+
   theme(
     legend.position = "top",
@@ -1317,4 +1317,229 @@ figure=ggarrange(softmax.plot,plots.sound_heartRate,nrow=2,
 ggexport(figure,filename=file.path(paths$figures,'FigureMain_Interoception_DecisionCurves_ConditionalEffects.tiff'),
          width=10*300,height=8*300,res=300)
 ```
+
+
+
+# Simulations
+The goal is to see whether we could have measured a heart rate effect in regressions. What we'll do for this:
+- Using the non-zscored data from Legrand, get regression weights for sound (range, mean, std) [check shape of distribution]
+- Draw random parameters from the distribution
+- Simulate choices for 100 participants
+- Fit
+- Plot regression weights
+
+!! To: repeat for different numbers of trials. This requires some re-organization of the code. Maybe at a minimum, we could just reduce the number of trials we had for our meditaiton study. Legrand: up to 160, but I'd say about 140 on average. Ours: up to 120, average about 100.
+
+
+Quick check on the data - n trials
+```{r}
+n.tr.legrand=gghistogram(cardio.legrand %>% dplyr::filter(Modality=='Intero') %>% group_by(ID) %>% dplyr::summarize(n()) %>% pull(`n()`))
+n.tr.meditation=gghistogram(cardio %>% dplyr::filter(Modality=='Intero' & session=='CDM') %>% group_by(ID) %>% dplyr::summarize(n()) %>% pull(`n()`))
+cardio %>%  group_by(ID,Modality,session) %>% dplyr::summarize(ntr=n())
+cardio.legrand %>% group_by(ID,Modality) %>% dplyr::summarize(ntr=n())
+ggarrange(n.tr.legrand,n.tr.meditation)
+```
+
+
+Fit the non-zscored data.
+Note: 
+- when fitting the Legrand data, some participants had fitting issues, we're skipping them (using tryCatch)
+- I demeaned but not z-scored the data. This is to help with the simulations (otherwise the intercept needs to absorbe the mean I think; and then combining different regression weights is trickier and for many simulations choices are always the same)
+- we selected 54 trials to have a similar number of trials as in our data
+```{r}
+
+results.legrand=data.frame()
+this.modality='Intero'
+n.trials= 54
+
+skip.first.n= 0 # set to 0 not to skip - tried it out, made no difference
+
+legrand.demeaned= cardio.legrand %>% dplyr::filter(Modality==this.modality) %>%
+  dplyr::group_by(ID) %>%
+  dplyr::mutate(listenBPM=listenBPM-mean(listenBPM),
+                responseBPM=responseBPM-mean(responseBPM),
+                trial.recount = row_number()) %>%
+  dplyr::filter(trial.recount>skip.first.n) %>% 
+  dplyr::mutate(maxTr=n()) %>%
+  # for each ID, draw n.trials random rows
+  sample_n(min(n.trials,maxTr)) %>%
+  ungroup()
+for (isub in unique(cardio.legrand$ID)){
+  #print(isub)
+  
+  df = legrand.demeaned %>% 
+    dplyr::filter(ID==isub & Modality==this.modality) %>%
+    
+    dplyr::mutate(Decision = dplyr::recode(Decision,'More'=1,'Less'=0)) %>%
+      dplyr::select(ID,listenBPM,responseBPM,Decision)
+  
+  this.glm= glm(Decision~ listenBPM+responseBPM,data=df,family='binomial')
+  
+  #tryCatch({m   <-  glm(y~x, family=binomial)}, warning=function(w) print(i))
+  
+  this.message='OK'
+  tryCatch(
+    this.glm<-glm(Decision~ listenBPM+responseBPM,data=df,family='binomial'),
+    warning = function(w) {this.message<<-'ERROR'}
+  )
+  if (this.message!='ERROR'){
+    t=as.data.frame(summary(this.glm)$coefficients) %>% tibble::rownames_to_column() %>%
+      dplyr::mutate(ID=isub,Modality=this.modality,ntr=nrow(df))
+    results.legrand=bind_rows(results.legrand,t)
+  } else{
+    print(paste('there was a warning, skipping', isub))
+  }
+  rm(this.message,this.glm,df)
+  
+}
+
+```
+
+Create new combinations of regression weights and then choices
+Note: 
+- heart rate regressors to be the same range as sound, but other way round
+- I've set the intercept to zero because we just want to test whether assuming the heart rate range is the same as sound range, can we measure an effect
+[done above! - We're drawing 47 random trials, as that's the minimum in the Legrand data and similar enough to our data.]
+- It turned out that with ~200 participants, the correlations were not very stable. So we need to have more.
+```{r}
+
+Intercept.t=results.legrand %>% dplyr::filter(rowname=='(Intercept)') %>% pull(Estimate)
+sound.t=results.legrand %>% dplyr::filter(rowname=='responseBPM') %>% pull(Estimate)
+heart.t=-(results.legrand %>% dplyr::filter(rowname=='responseBPM') %>% pull(Estimate)) # flipped
+ID.t=results.legrand %>% dplyr::filter(rowname=='responseBPM') %>% pull(ID)
+                                              
+n.rep.simuls = 10 # to get 2000 in total 
+simul.regs=data.frame()
+for (irep.simul in 1:n.rep.simuls){
+  simul.regst = data.frame(ID=ID.t[sample(1:length(ID.t),replace=F)],
+                          Intercept=0, #Intercept.t[sample(1:length(Intercept.t),replace=T)],
+                          sound=sound.t[sample(1:length(sound.t),replace=F)],
+                          heart=heart.t[sample(1:length(heart.t),replace=F)],
+                          simul=irep.simul)
+  simul.regs = rbind(simul.regs,simul.regst)
+}
+
+simul.choices = data.frame()
+for (isimul in unique(simul.regs$simul)){
+  for (isub in unique(simul.regs$ID)){
+   # print(isub)
+    df = legrand.demeaned %>% 
+      dplyr::filter( ID==isub) %>% 
+      dplyr::select(listenBPM,responseBPM,ID) 
+    
+    
+    this.sub.regs = simul.regs %>% dplyr::filter(ID==isub & simul==isimul)
+    df= df %>% dplyr::mutate(lin.pred = this.sub.regs$Intercept + this.sub.regs$sound*responseBPM + this.sub.regs$heart*listenBPM,
+                             pMore = 1/(1+exp(-lin.pred)),
+                             Decision.simul= runif(nrow(df),min=0,max=1) < pMore,
+                             #Decision.simul = rbinom(n=1,size=1,prob=pMore),
+                             simul=isimul)
+    simul.choices= bind_rows(simul.choices,df %>% dplyr::select(ID,listenBPM,responseBPM,pMore,Decision.simul,simul))
+  }
+}
+
+```
+
+Fit the simulations
+```{r}
+simul.fits=data.frame()
+for (isimul  in unique(simul.choices$simul)){
+for (isub in unique(simul.choices$ID)){
+  
+  this.modality='Intero'
+  df = simul.choices %>% 
+    dplyr::filter(ID==isub& simul==isimul ) %>% 
+    dplyr::rename(Decision = Decision.simul)
+  
+  this.glm= glm(Decision~ listenBPM+responseBPM,data=df,family='binomial')
+  
+  #tryCatch({m   <-  glm(y~x, family=binomial)}, warning=function(w) print(i))
+  
+  this.message='OK'
+  tryCatch(
+    this.glm<-glm(Decision~ listenBPM+responseBPM,data=df,family='binomial'),
+    warning = function(w) {this.message<<-'ERROR'}
+  )
+  if (this.message!='ERROR'){
+    t=as.data.frame(summary(this.glm)$coefficients) %>% tibble::rownames_to_column() %>%
+      dplyr::mutate(ID=isub,Modality=this.modality,simul=isimul)
+    simul.fits=bind_rows(simul.fits,t)
+  } else{
+    print(paste('there was a warning, skipping', isub))
+  }
+  rm(this.message,this.glm,df)
+  
+}
+}
+
+simul.fits.wide= simul.fits  %>% dplyr::select(ID,simul,rowname,Estimate) %>% 
+    dplyr::filter(rowname %in% c('listenBPM','responseBPM')) %>% dplyr::mutate(rowname=dplyr::recode(rowname,'listenBPM'='heart.fit','responseBPM'='sound.fit')) %>%
+    pivot_wider(.,id_cols=c('ID','simul'),names_from='rowname',values_from='Estimate')
+```
+
+Plot the results
+I've done correlations as that's what you usually do for parameter recovery. But here, we rather want to know whether the group level was significant. 
+So what we can do is take x times samples of say 20 participants, and check the significance (and direction) of the simulated and fitted parameters
+```{r}
+
+t=left_join(simul.fits.wide,simul.regs %>% dplyr::rename(sound.simul=sound,heart.simul=heart),by=c('ID','simul'))
+# Correlations
+
+plot.heart=ggscatter(t,x='heart.simul',y='heart.fit',add = 'reg.line',cor.coef=T)
+plot.sound=ggscatter(t,x='sound.simul',y='sound.fit',add = 'reg.line',cor.coef=T)
+plot.tog=ggarrange(plot.heart,plot.sound,nrow=1)
+
+# Main effects 
+nrep= 1000
+sample.size=20
+results.subsets=data.frame()
+for (irep in 1:nrep){
+  selection=data.frame(IDs = simul.fits.wide$ID[sample(1:nrow(simul.fits.wide),size=sample.size,replace=F)],
+                       simul=simul.fits.wide$simul[sample(1:nrow(simul.fits.wide),size=sample.size,replace=F)])
+  
+  simuls = simul.regs %>% dplyr::filter(ID %in% IDs) %>% dplyr::rename(heart.simul=heart,sound.simul=sound) %>%
+    dplyr::select(-Intercept)
+  fits = simul.fits.wide
+  tog=left_join(simuls,fits,by='ID')
+  # t-test on each column
+  t= tog %>% pivot_longer(cols=c('heart.simul','heart.fit','sound.simul','sound.fit'),names_to='type',values_to='Estimate') %>%
+    dplyr::group_by(type) %>%
+    dplyr::summarize(meanEstimate=mean(Estimate),
+                     sdEstimate=sd(Estimate),
+                     n=n(),
+                     se=sdEstimate/sqrt(n),
+                     p.value=t.test(Estimate,mu=0)$p.value,
+                     p.wilcox=wilcox.test(Estimate,mu=0)$p.value,
+                     estimate=t.test(Estimate,mu=0)$estimate) %>%
+    dplyr::mutate(rep=irep)
+  results.subsets=bind_rows(results.subsets,t)
+}
+# counts
+out=results.subsets %>%
+  dplyr::group_by(type) %>%
+  dplyr::summarize(count.sig=sum(p.value<0.05),
+                   count.sig.wilcox=sum(p.wilcox<0.05),
+                   prop.sig = mean(p.value<0.05),
+                   prop.sig.wilcox = mean(p.wilcox<0.05))
+
+# let's also check original range of heart rates
+range = simul.choices  %>%
+  dplyr::group_by(ID) %>%
+  dplyr::summarize(minHR=min(listenBPM,na.rm=T),
+                   maxHR=max(listenBPM,na.rm=T),
+                   meanHR=mean(listenBPM,na.rm=T),
+                   sdHR=sd(listenBPM,na.rm=T),
+                   rangeHR=maxHR-minHR,
+                   # the same for sound
+                   minSound=min(responseBPM,na.rm=T),
+                   maxSound=max(responseBPM,na.rm=T),
+                   meanSound=mean(responseBPM,na.rm=T),
+                   sdSound=sd(responseBPM,na.rm=T),
+                   rangeSound=maxSound-minSound) 
+  
+# let's check the HR range against the parameters
+paras.HR = left_join(simul.fits.wide, range,by='ID')
+tab_corr(paras.HR %>% dplyr::select_if(is.numeric) ) 
+```
+
 
