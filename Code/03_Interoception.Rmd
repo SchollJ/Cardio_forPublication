@@ -1485,24 +1485,27 @@ So what we can do is take x times samples of say 20 participants, and check the 
 t=left_join(simul.fits.wide,simul.regs %>% dplyr::rename(sound.simul=sound,heart.simul=heart),by=c('ID','simul'))
 # Correlations
 
-plot.heart=ggscatter(t,x='heart.simul',y='heart.fit',add = 'reg.line',cor.coef=T)
-plot.sound=ggscatter(t,x='sound.simul',y='sound.fit',add = 'reg.line',cor.coef=T)
+plot.heart=ggscatter(t,x='heart.simul',y='heart.fit',add = 'reg.line',cor.coef=T,xlab='Simulated',ylab='Fitted',title='Ai Heart')
+plot.sound=ggscatter(t,x='sound.simul',y='sound.fit',add = 'reg.line',cor.coef=T,xlab='Simulated',ylab='Fitted',title='Aii Sound')
 plot.tog=ggarrange(plot.heart,plot.sound,nrow=1)
 
 # Main effects 
-nrep= 1000
+nrep= 500
 sample.size=20
 results.subsets=data.frame()
 for (irep in 1:nrep){
-  selection=data.frame(IDs = simul.fits.wide$ID[sample(1:nrow(simul.fits.wide),size=sample.size,replace=F)],
-                       simul=simul.fits.wide$simul[sample(1:nrow(simul.fits.wide),size=sample.size,replace=F)])
-  
-  simuls = simul.regs %>% dplyr::filter(ID %in% IDs) %>% dplyr::rename(heart.simul=heart,sound.simul=sound) %>%
-    dplyr::select(-Intercept)
-  fits = simul.fits.wide
-  tog=left_join(simuls,fits,by='ID')
+
+  selection=simul.fits.wide %>% dplyr::slice_sample(n=sample.size)
+    
+    
+  tog=left_join(selection,simul.regs %>% 
+                  dplyr::rename(heart.simul=heart,sound.simul=sound) %>%
+                  dplyr::select(-Intercept),
+                by=c('ID','simul')) %>%
+    # now with new shuffling doesnt make sense for simul
+    dplyr::select(-heart.simul,-sound.simul)
   # t-test on each column
-  t= tog %>% pivot_longer(cols=c('heart.simul','heart.fit','sound.simul','sound.fit'),names_to='type',values_to='Estimate') %>%
+  t= tog %>% pivot_longer(cols=c('heart.fit','sound.fit'),names_to='type',values_to='Estimate') %>%
     dplyr::group_by(type) %>%
     dplyr::summarize(meanEstimate=mean(Estimate),
                      sdEstimate=sd(Estimate),
@@ -1540,6 +1543,21 @@ range = simul.choices  %>%
 # let's check the HR range against the parameters
 paras.HR = left_join(simul.fits.wide, range,by='ID')
 tab_corr(paras.HR %>% dplyr::select_if(is.numeric) ) 
+
+# Plot results.subsets for type==heart.fit, column  p.value, add a vertical line at 0.05
+plot.results.subsets=gghistogram(results.subsets %>% dplyr::filter(type=='heart.fit'),
+                                 x='p.value',ylab='Number of simulation sets of n=20',xlab='p-value', 
+                                 title='B Group (n=20) simulated effect significance')+
+  geom_vline(xintercept=0.05,linetype='dashed',color='red')
+  
+
+# Combine the plots
+plot.supplement.simulation=ggarrange(plot.tog,plot.results.subsets,nrow=2,
+          common.legend=F,
+          # left align the labels
+          hjust=0)
+ggexport(plot.supplement.simulation,filename=file.path(paths$figures,'Supplements_simulation.tiff'),
+         width=8*300,height=8*300,res=300)
 ```
 
 
