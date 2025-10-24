@@ -1625,6 +1625,8 @@ ggexport(out.plots.onlySignifHeartSimul$plot.supplement.simulation,
 ```
 
 # Legrand 
+The results are pretty intersting: while in session 1, participants cannot do the task (no significant effect of heart rate), they can in session 2. And there is potentially an effect that participants who could do it in session 1 are also more likely to be able to do it in session 2. Though this does not hold up in the other direction. To fully explain all of this in the present paper would be too much. We have therefore not included it. It is also well possible that Micah Allen and colleagues would prefer to do and publish these analyses themselves (potentially with their new modeling that has some extra features). 
+
 ##- test-retest (ish)
 
 
