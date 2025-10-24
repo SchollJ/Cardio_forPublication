@@ -111,6 +111,17 @@ for (ifold in folders){
                                   read.csv(file.path(ifold,'filtered.txt')) %>% dplyr::mutate(ID=ID))
 }
 cardio.legrand =cardio.legrand.unfiltered %>% dplyr::filter(HeartRateOutlier=='False') %>% dplyr::filter(Decision!="")
+
+# retest 
+folders=list.files(file.path(paths$base.path,'Data','CardioceptionPaper-main','data','raw','HRD2'),full.names = T)
+cardio.legrand.unfiltered= data.frame()
+for (ifold in folders){
+  ID=stringr::str_split(ifold,'/')[[1]][length(stringr::str_split(ifold,'/')[[1]])]
+  cardio.legrand.unfiltered=rbind(cardio.legrand.unfiltered,
+                                  read.csv(file.path(ifold,'filtered.txt')) %>% dplyr::mutate(ID=ID))
+}
+cardio.legrand.session2 =cardio.legrand.unfiltered %>% dplyr::filter(HeartRateOutlier=='False') %>% dplyr::filter(Decision!="")
+
 ```
 
 
@@ -1330,7 +1341,7 @@ The goal is to see whether we could have measured a heart rate effect in regress
 
 !! To: repeat for different numbers of trials. This requires some re-organization of the code. Maybe at a minimum, we could just reduce the number of trials we had for our meditaiton study. Legrand: up to 160, but I'd say about 140 on average. Ours: up to 120, average about 100.
 
-
+## Fit the original Legrand data
 Quick check on the data - n trials
 ```{r}
 n.tr.legrand=gghistogram(cardio.legrand %>% dplyr::filter(Modality=='Intero') %>% group_by(ID) %>% dplyr::summarize(n()) %>% pull(`n()`))
@@ -1361,8 +1372,9 @@ legrand.demeaned= cardio.legrand %>% dplyr::filter(Modality==this.modality) %>%
                 trial.recount = row_number()) %>%
   dplyr::filter(trial.recount>skip.first.n) %>% 
   dplyr::mutate(maxTr=n()) %>%
-  # for each ID, draw n.trials random rows
-  sample_n(min(n.trials,maxTr)) %>%
+  # for each ID, select only the first n.trials
+  dplyr::filter(trial.recount <= min(n.trials,maxTr)) %>%
+  #sample_n(min(n.trials,maxTr)) %>%
   ungroup()
 for (isub in unique(cardio.legrand$ID)){
   #print(isub)
@@ -1395,6 +1407,8 @@ for (isub in unique(cardio.legrand$ID)){
 
 ```
 
+
+## Functions to make new combinations of regression weights, simulate choices, fit the choices and make plots
 Create new combinations of regression weights and then choices
 Note: 
 - heart rate regressors to be the same range as sound, but other way round
@@ -1402,46 +1416,62 @@ Note:
 [done above! - We're drawing 47 random trials, as that's the minimum in the Legrand data and similar enough to our data.]
 - It turned out that with ~200 participants, the correlations were not very stable. So we need to have more.
 ```{r}
-
-Intercept.t=results.legrand %>% dplyr::filter(rowname=='(Intercept)') %>% pull(Estimate)
-sound.t=results.legrand %>% dplyr::filter(rowname=='responseBPM') %>% pull(Estimate)
-heart.t=-(results.legrand %>% dplyr::filter(rowname=='responseBPM') %>% pull(Estimate)) # flipped
-ID.t=results.legrand %>% dplyr::filter(rowname=='responseBPM') %>% pull(ID)
-                                              
-n.rep.simuls = 10 # to get 2000 in total 
-simul.regs=data.frame()
-for (irep.simul in 1:n.rep.simuls){
-  simul.regst = data.frame(ID=ID.t[sample(1:length(ID.t),replace=F)],
-                          Intercept=0, #Intercept.t[sample(1:length(Intercept.t),replace=T)],
-                          sound=sound.t[sample(1:length(sound.t),replace=F)],
-                          heart=heart.t[sample(1:length(heart.t),replace=F)],
-                          simul=irep.simul)
-  simul.regs = rbind(simul.regs,simul.regst)
-}
-
-simul.choices = data.frame()
-for (isimul in unique(simul.regs$simul)){
-  for (isub in unique(simul.regs$ID)){
-   # print(isub)
-    df = legrand.demeaned %>% 
-      dplyr::filter( ID==isub) %>% 
-      dplyr::select(listenBPM,responseBPM,ID) 
-    
-    
-    this.sub.regs = simul.regs %>% dplyr::filter(ID==isub & simul==isimul)
-    df= df %>% dplyr::mutate(lin.pred = this.sub.regs$Intercept + this.sub.regs$sound*responseBPM + this.sub.regs$heart*listenBPM,
-                             pMore = 1/(1+exp(-lin.pred)),
-                             Decision.simul= runif(nrow(df),min=0,max=1) < pMore,
-                             #Decision.simul = rbinom(n=1,size=1,prob=pMore),
-                             simul=isimul)
-    simul.choices= bind_rows(simul.choices,df %>% dplyr::select(ID,listenBPM,responseBPM,pMore,Decision.simul,simul))
+func.simulateRegWeightsChoices = function(selection.type){
+  if (selection.type=='allParticipants'){
+    Intercept.t=results.legrand %>% dplyr::filter(rowname=='(Intercept)') %>% pull(Estimate)
+    sound.t=results.legrand %>% dplyr::filter(rowname=='responseBPM') %>% pull(Estimate)
+    heart.t=-(results.legrand %>% dplyr::filter(rowname=='responseBPM') %>% pull(Estimate)) # flipped
+    ID.t=results.legrand %>% dplyr::filter(rowname=='responseBPM') %>% pull(ID)
+  } else if (selection.type=='onlyHeartRightDirection'){
+    heartGood.IDs = results.legrand %>% dplyr::filter(rowname=='listenBPM' & Estimate<0) %>% pull(ID)
+    Intercept.t=results.legrand %>% dplyr::filter(rowname=='(Intercept)' & ID %in% heartGood.IDs) %>% pull(Estimate)
+    sound.t=results.legrand %>% dplyr::filter(rowname=='responseBPM' & ID %in% heartGood.IDs) %>% pull(Estimate)
+    heart.t=results.legrand %>% dplyr::filter(rowname=='listenBPM' & ID %in% heartGood.IDs) %>% pull(Estimate) # good participants
+    ID.t=results.legrand %>% dplyr::filter(rowname=='responseBPM' & ID %in% heartGood.IDs) %>% pull(ID)
   }
+  
+  
+  
+  n.rep.simuls = 10 # to get 2000 in total 
+  simul.regs=data.frame()
+  for (irep.simul in 1:n.rep.simuls){
+    simul.regst = data.frame(ID=ID.t[sample(1:length(ID.t),replace=F)],
+                             Intercept=0, #Intercept.t[sample(1:length(Intercept.t),replace=T)],
+                             sound=sound.t[sample(1:length(sound.t),replace=F)],
+                             heart=heart.t[sample(1:length(heart.t),replace=F)],
+                             simul=irep.simul)
+    simul.regs = rbind(simul.regs,simul.regst)
+  }
+  
+  simul.choices = data.frame()
+  for (isimul in unique(simul.regs$simul)){
+    for (isub in unique(simul.regs$ID)){
+      # print(isub)
+      df = legrand.demeaned %>% 
+        dplyr::filter( ID==isub) %>% 
+        dplyr::select(listenBPM,responseBPM,ID) 
+      
+      
+      this.sub.regs = simul.regs %>% dplyr::filter(ID==isub & simul==isimul)
+      df= df %>% dplyr::mutate(lin.pred = this.sub.regs$Intercept + this.sub.regs$sound*responseBPM + this.sub.regs$heart*listenBPM,
+                               pMore = 1/(1+exp(-lin.pred)),
+                               Decision.simul= runif(nrow(df),min=0,max=1) < pMore,
+                               #Decision.simul = rbinom(n=1,size=1,prob=pMore),
+                               simul=isimul)
+      simul.choices= bind_rows(simul.choices,df %>% dplyr::select(ID,listenBPM,responseBPM,pMore,Decision.simul,simul))
+    }
+  }
+  out=list()
+  out$simul.choices = simul.choices
+  out$simul.regs = simul.regs
+  return(out)
 }
 
 ```
 
 Fit the simulations
 ```{r}
+func.fitSimul=function(simul.choices){
 simul.fits=data.frame()
 for (isimul  in unique(simul.choices$simul)){
 for (isub in unique(simul.choices$ID)){
@@ -1475,89 +1505,347 @@ for (isub in unique(simul.choices$ID)){
 simul.fits.wide= simul.fits  %>% dplyr::select(ID,simul,rowname,Estimate) %>% 
     dplyr::filter(rowname %in% c('listenBPM','responseBPM')) %>% dplyr::mutate(rowname=dplyr::recode(rowname,'listenBPM'='heart.fit','responseBPM'='sound.fit')) %>%
     pivot_wider(.,id_cols=c('ID','simul'),names_from='rowname',values_from='Estimate')
+out=list()
+out$simul.fits=simul.fits
+out$simul.fits.wide=simul.fits.wide
+return(out)
+}
 ```
 
 Plot the results
 I've done correlations as that's what you usually do for parameter recovery. But here, we rather want to know whether the group level was significant. 
 So what we can do is take x times samples of say 20 participants, and check the significance (and direction) of the simulated and fitted parameters
+
+out.plots.sameEffectHeartSound=func.plotSimulationResults(out.fits$simul.fits.wide,out.regs$simul.regs,out.fits$simul.choices)
+
+
 ```{r}
-
-t=left_join(simul.fits.wide,simul.regs %>% dplyr::rename(sound.simul=sound,heart.simul=heart),by=c('ID','simul'))
-# Correlations
-
-plot.heart=ggscatter(t,x='heart.simul',y='heart.fit',add = 'reg.line',cor.coef=T,xlab='Simulated',ylab='Fitted',title='Ai Heart')
-plot.sound=ggscatter(t,x='sound.simul',y='sound.fit',add = 'reg.line',cor.coef=T,xlab='Simulated',ylab='Fitted',title='Aii Sound')
-plot.tog=ggarrange(plot.heart,plot.sound,nrow=1)
-
-# Main effects 
-nrep= 500
-sample.size=20
-results.subsets=data.frame()
-for (irep in 1:nrep){
-
-  selection=simul.fits.wide %>% dplyr::slice_sample(n=sample.size)
+func.plotSimulationResults=function(simul.fits.wide,simul.regs,simul.choices){
+  t=left_join(simul.fits.wide,simul.regs %>% dplyr::rename(sound.simul=sound,heart.simul=heart),by=c('ID','simul'))
+  # Correlations
+  
+  plot.heart=ggscatter(t,x='heart.simul',y='heart.fit',add = 'reg.line',cor.coef=T,xlab='Simulated',ylab='Fitted',title='Ai Heart')
+  plot.sound=ggscatter(t,x='sound.simul',y='sound.fit',add = 'reg.line',cor.coef=T,xlab='Simulated',ylab='Fitted',title='Aii Sound')
+  plot.tog=ggarrange(plot.heart,plot.sound,nrow=1)
+  
+  # Main effects 
+  nrep= 500
+  sample.size=20
+  results.subsets=data.frame()
+  for (irep in 1:nrep){
+    
+    selection=simul.fits.wide %>% dplyr::slice_sample(n=sample.size)
     
     
-  tog=left_join(selection,simul.regs %>% 
-                  dplyr::rename(heart.simul=heart,sound.simul=sound) %>%
-                  dplyr::select(-Intercept),
-                by=c('ID','simul')) %>%
-    # now with new shuffling doesnt make sense for simul
-    dplyr::select(-heart.simul,-sound.simul)
-  # t-test on each column
-  t= tog %>% pivot_longer(cols=c('heart.fit','sound.fit'),names_to='type',values_to='Estimate') %>%
+    tog=left_join(selection,simul.regs %>% 
+                    dplyr::rename(heart.simul=heart,sound.simul=sound) %>%
+                    dplyr::select(-Intercept),
+                  by=c('ID','simul')) %>%
+      # now with new shuffling doesnt make sense for simul
+      dplyr::select(-heart.simul,-sound.simul)
+    # t-test on each column
+    t= tog %>% pivot_longer(cols=c('heart.fit','sound.fit'),names_to='type',values_to='Estimate') %>%
+      dplyr::group_by(type) %>%
+      dplyr::summarize(meanEstimate=mean(Estimate),
+                       sdEstimate=sd(Estimate),
+                       n=n(),
+                       se=sdEstimate/sqrt(n),
+                       p.value=t.test(Estimate,mu=0)$p.value,
+                       p.wilcox=wilcox.test(Estimate,mu=0)$p.value,
+                       estimate=t.test(Estimate,mu=0)$estimate) %>%
+      dplyr::mutate(rep=irep)
+    results.subsets=bind_rows(results.subsets,t)
+  }
+  # counts
+  summary.significantCounts=results.subsets %>%
     dplyr::group_by(type) %>%
-    dplyr::summarize(meanEstimate=mean(Estimate),
-                     sdEstimate=sd(Estimate),
-                     n=n(),
-                     se=sdEstimate/sqrt(n),
-                     p.value=t.test(Estimate,mu=0)$p.value,
-                     p.wilcox=wilcox.test(Estimate,mu=0)$p.value,
-                     estimate=t.test(Estimate,mu=0)$estimate) %>%
-    dplyr::mutate(rep=irep)
-  results.subsets=bind_rows(results.subsets,t)
+    dplyr::summarize(count.sig=sum(p.value<0.05),
+                     count.sig.wilcox=sum(p.wilcox<0.05),
+                     prop.sig = mean(p.value<0.05),
+                     prop.sig.wilcox = mean(p.wilcox<0.05))
+  
+  # let's also check original range of heart rates
+  range = simul.choices  %>%
+    dplyr::group_by(ID) %>%
+    dplyr::summarize(minHR=min(listenBPM,na.rm=T),
+                     maxHR=max(listenBPM,na.rm=T),
+                     meanHR=mean(listenBPM,na.rm=T),
+                     sdHR=sd(listenBPM,na.rm=T),
+                     rangeHR=maxHR-minHR,
+                     # the same for sound
+                     minSound=min(responseBPM,na.rm=T),
+                     maxSound=max(responseBPM,na.rm=T),
+                     meanSound=mean(responseBPM,na.rm=T),
+                     sdSound=sd(responseBPM,na.rm=T),
+                     rangeSound=maxSound-minSound) 
+  
+  # let's check the HR range against the parameters
+  paras.HR = left_join(simul.fits.wide, range,by='ID')
+  tab_corr(paras.HR %>% dplyr::select_if(is.numeric) ) 
+  
+  # Plot results.subsets for type==heart.fit, column  p.value, add a vertical line at 0.05
+  plot.results.subsets=gghistogram(results.subsets %>% dplyr::filter(type=='heart.fit'),
+                                   x='p.value',ylab='Number of simulation sets of n=20',xlab='p-value', 
+                                   title='B Group (n=20) simulated effect significance')+
+    geom_vline(xintercept=0.05,linetype='dashed',color='red')
+  
+  
+  # Combine the plots
+  plot.supplement.simulation=ggarrange(plot.tog,plot.results.subsets,nrow=2,
+                                       common.legend=F,
+                                       # left align the labels
+                                       hjust=0)
+  
+  out=list()
+  out$summary.significantCounts= summary.significantCounts
+  out$plot.supplement.simulation= plot.supplement.simulation
+  return(out)
 }
-# counts
-out=results.subsets %>%
-  dplyr::group_by(type) %>%
-  dplyr::summarize(count.sig=sum(p.value<0.05),
-                   count.sig.wilcox=sum(p.wilcox<0.05),
-                   prop.sig = mean(p.value<0.05),
-                   prop.sig.wilcox = mean(p.wilcox<0.05))
+```
 
-# let's also check original range of heart rates
-range = simul.choices  %>%
-  dplyr::group_by(ID) %>%
-  dplyr::summarize(minHR=min(listenBPM,na.rm=T),
-                   maxHR=max(listenBPM,na.rm=T),
-                   meanHR=mean(listenBPM,na.rm=T),
-                   sdHR=sd(listenBPM,na.rm=T),
-                   rangeHR=maxHR-minHR,
-                   # the same for sound
-                   minSound=min(responseBPM,na.rm=T),
-                   maxSound=max(responseBPM,na.rm=T),
-                   meanSound=mean(responseBPM,na.rm=T),
-                   sdSound=sd(responseBPM,na.rm=T),
-                   rangeSound=maxSound-minSound) 
-  
-# let's check the HR range against the parameters
-paras.HR = left_join(simul.fits.wide, range,by='ID')
-tab_corr(paras.HR %>% dplyr::select_if(is.numeric) ) 
 
-# Plot results.subsets for type==heart.fit, column  p.value, add a vertical line at 0.05
-plot.results.subsets=gghistogram(results.subsets %>% dplyr::filter(type=='heart.fit'),
-                                 x='p.value',ylab='Number of simulation sets of n=20',xlab='p-value', 
-                                 title='B Group (n=20) simulated effect significance')+
-  geom_vline(xintercept=0.05,linetype='dashed',color='red')
-  
+## Run for different simulation settings
+Simulating from participants that have the regression weights in the right direction suggest that in fact if it should be possible to select people who can do the task well and then have them perform it again. with 20 participants, 84% of the time, the group level effect would be significnat again. We can then test it in the legrand data: selecting participants at time one who can do the task, and then make them do it again at time 2.
+```{r}
+# [1] Assume that the size of the effect is the same for heart and sound
+out.regs=func.simulateRegWeightsChoices('allParticipants')
+out.fits=func.fitSimul(out.regs$simul.choices)
+out.plots.sameEffectHeartSound=func.plotSimulationResults(out.fits$simul.fits.wide,out.regs$simul.regs,out.regs$simul.choices)
+ggexport(out.plots.sameEffectHeartSound$plot.supplement.simulation,
+         filename=file.path(paths$figures,'Supplements_simulation_sameEffectHeartSound.tiff'),
+         width=8*300,height=8*300,res=300)
 
-# Combine the plots
-plot.supplement.simulation=ggarrange(plot.tog,plot.results.subsets,nrow=2,
-          common.legend=F,
-          # left align the labels
-          hjust=0)
-ggexport(plot.supplement.simulation,filename=file.path(paths$figures,'Supplements_simulation.tiff'),
+# [2] Assume every participant with the heart rate effect in the right direction does the task again (But regression weights shuffled)
+out.regs=func.simulateRegWeightsChoices('onlyHeartRightDirection')
+out.fits=func.fitSimul(out.regs$simul.choices)
+out.plots.onlySignifHeartSimul=func.plotSimulationResults(out.fits$simul.fits.wide,out.regs$simul.regs,out.regs$simul.choices)
+ggexport(out.plots.onlySignifHeartSimul$plot.supplement.simulation,
+         filename=file.path(paths$figures,'Supplements_simulation_heartSensitiveParticipantsOnly.tiff'),
          width=8*300,height=8*300,res=300)
 ```
+
+# Legrand 
+##- test-retest (ish)
+
+
+```{r}
+
+func.fitLegrandForRetest= function(input){
+  results.legrand=data.frame()
+  this.modality='Intero'
+  #n.trials= 54
+  
+#  skip.first.n= 0 # set to 0 not to skip - tried it out, made no difference
+  # use all trials
+  legrand.demeaned= input %>% dplyr::filter(Modality==this.modality) %>%
+    dplyr::group_by(ID) %>%
+    dplyr::mutate(listenBPM=listenBPM-mean(listenBPM),
+                  responseBPM=responseBPM-mean(responseBPM),
+                  trial.recount = row_number()) %>%
+    dplyr::filter(trial.recount>skip.first.n) %>% 
+    dplyr::mutate(maxTr=n()) %>%
+
+    ungroup()
+  for (isub in unique(input$ID)){
+    #print(isub)
+    
+    df = legrand.demeaned %>% 
+      dplyr::filter(ID==isub & Modality==this.modality) %>%
+      
+      dplyr::mutate(Decision = dplyr::recode(Decision,'More'=1,'Less'=0)) %>%
+      dplyr::select(ID,listenBPM,responseBPM,Decision)
+    
+    this.glm= glm(Decision~ listenBPM+responseBPM,data=df,family='binomial')
+    
+    #tryCatch({m   <-  glm(y~x, family=binomial)}, warning=function(w) print(i))
+    
+    this.message='OK'
+    tryCatch(
+      this.glm<-glm(Decision~ listenBPM+responseBPM,data=df,family='binomial'),
+      warning = function(w) {this.message<<-'ERROR'}
+    )
+    if (this.message!='ERROR'){
+      t=as.data.frame(summary(this.glm)$coefficients) %>% tibble::rownames_to_column() %>%
+        dplyr::mutate(ID=isub,Modality=this.modality,ntr=nrow(df))
+      results.legrand=bind_rows(results.legrand,t)
+    } else{
+      print(paste('there was a warning, skipping', isub))
+    }
+    rm(this.message,this.glm,df)
+    
+  }
+  return(results.legrand)
+}
+
+```
+
+```{r}
+results.legrand.day1= func.fitLegrandForRetest(cardio.legrand)
+results.legrand.day2= func.fitLegrandForRetest(cardio.legrand.session2)
+
+comb=left_join(results.legrand.day2 %>% dplyr::select(ID,rowname,Estimate) %>% dplyr::rename(regwday2=Estimate),
+               results.legrand.day1 %>% dplyr::select(ID,rowname,Estimate) %>% dplyr::rename(regwday1=Estimate),
+               by=c('ID','rowname'))
+tab_corr(comb %>% dplyr::filter(rowname=='listenBPM') %>% dplyr::select_if(is.numeric))
+tab_corr(comb %>% dplyr::filter(rowname=='responseBPM') %>% dplyr::select_if(is.numeric))
+
+# To check: sound
+t.test(comb %>% dplyr::filter(rowname=='responseBPM') %>% pull(regwday1))
+t.test(comb %>% dplyr::filter(rowname=='responseBPM') %>% pull(regwday2))
+
+# Participants who can do the task on day 1 - surprisingly this works
+t.test(comb %>% dplyr::filter(rowname=='listenBPM' & regwday1<0) %>% pull(regwday2))
+# Select based on day 2:
+t.test(comb %>% dplyr::filter(rowname=='listenBPM' & regwday2<0) %>% pull(regwday1))
+# All participants
+t.test(comb %>% dplyr::filter(rowname=='listenBPM') %>% pull(regwday2))
+t.test(comb %>% dplyr::filter(rowname=='listenBPM') %>% pull(regwday1))
+# How many participants can do the task (negative regression weights for listen, positive for sound) on both days
+nrow(comb %>% dplyr::filter(rowname=='listenBPM' & regwday2<0 & regwday1<0))/(length(unique(comb$ID)))
+nrow(comb %>% dplyr::filter(rowname=='listenBPM' & regwday1<0))/(length(unique(comb$ID)))
+t.listen=comb %>% dplyr::filter(rowname=='listenBPM' & regwday2<0 & regwday1<0)
+t.response=comb %>% dplyr::filter(rowname=='responseBPM' & regwday2>0 & regwday1>0)
+length(intersect(t.listen$ID,t.response$ID))/(length(unique(comb$ID)))
+
+# Compare  day 1 to day 2
+fig.scatterRegwDay1Day2= comb %>% 
+  dplyr::filter(rowname=='listenBPM') %>%
+  dplyr::mutate(improvement= regwday2 - regwday1) %>%
+  ggscatter(x='regwday1',y='regwday2',add='reg.line',cor.coef=T,
+            xlab='Day 1 regression weight (heart rate)',ylab='Day 2 reg weight')+
+  geom_hline(yintercept=0, linetype='dashed', color='red')
+# Overall improvement day 1 vs day 2?
+t=comb %>% 
+  dplyr::mutate(improvement= regwday2 - regwday1) 
+t.test(t %>% dplyr::filter(rowname=='listenBPM') %>% pull(improvement))
+t.test(t %>% dplyr::filter(rowname=='responseBPM') %>% pull(improvement))
+
+
+
+
+# As a control analysis: participants with reversed regression weights should be noise (?)
+t.test(comb %>% dplyr::filter(rowname=='listenBPM' & regwday1>0) %>% pull(regwday2))
+
+nrow(comb %>% dplyr::filter(rowname=='listenBPM' & regwday2<0 & regwday1<0))
+nrow(comb %>% dplyr::filter(rowname=='listenBPM' & regwday1<0))
+nrow(comb %>% dplyr::filter(rowname=='listenBPM' & regwday2<0 & regwday1<0))/
+  nrow(comb %>% dplyr::filter(rowname=='listenBPM' & regwday1<0))
+nrow(comb %>% dplyr::filter(rowname=='listenBPM' & regwday2<0 ))/
+  nrow(comb %>% dplyr::filter(rowname=='listenBPM' ))
+nrow(comb %>% dplyr::filter(rowname=='listenBPM' & regwday1<0 ))/
+  nrow(comb %>% dplyr::filter(rowname=='listenBPM' ))
+
+# Heart rate variability: the people who seem to be able to do the task, is it because of their variability?
+heart.rates.mean.sd.legrand1= cardio.legrand %>% 
+  dplyr::filter(Modality=='Intero') %>% group_by(ID) %>% 
+  dplyr::summarize(listenBPM.mean.session1=mean(listenBPM),
+                   listenBPM.sd.session1  = sd(listenBPM))
+heart.rates.mean.sd.legrand2= cardio.legrand.session2 %>% 
+  dplyr::filter(Modality=='Intero') %>% group_by(ID) %>% 
+  dplyr::summarize(listenBPM.mean.session2=mean(listenBPM),
+                   listenBPM.sd.session2  = sd(listenBPM))
+comb.heartRates= left_join(comb %>% dplyr::filter(rowname=='listenBPM'),
+                             heart.rates.mean.sd.legrand1,
+                             by='ID') %>%
+  left_join(.,heart.rates.mean.sd.legrand2,by='ID')
+ggscatter(comb.heartRates,x='regwday1',y='listenBPM.sd.session1',add='reg.line',cor.coef=T)+
+  xlab('Day 1 regression weight (heart rate)')+ylab('Day 1 heart rate SD')
+ggscatter(comb.heartRates,x='regwday2',y='listenBPM.sd.session2',add='reg.line',cor.coef=T)+
+  xlab('Day 2 regression weight (heart rate)')+ylab('Day 2 heart rate SD')
+tab_corr(comb.heartRates %>% dplyr::select_if(is.numeric))
+tab_corr(comb.heartRates %>% dplyr::select_if(is.numeric),corr.method='spearman')
+```
+
+## Curves for heart rate and sound (hierarchical regression)
+```{r}
+fits=list()
+plots=list()
+for (isession in c('session1','session2')){
+  if (isession=='session1'){
+    legrand.this=cardio.legrand
+  } else{
+    legrand.this = cardio.legrand.session2
+  }
+  df.scaled.within.legrand= legrand.this %>% dplyr::filter(Modality=='Intero') %>%
+    dplyr::mutate(Decision.num = case_when(Decision=='More' ~1,
+                                           Decision=='Less' ~ 0)) %>%
+    dplyr::select(ID,Decision.num,listenBPM,responseBPM) %>%
+    group_by(ID) %>%
+    dplyr::mutate_at(c('listenBPM','responseBPM'),scale) %>%
+    dplyr::rename('heartBPM'='listenBPM','soundBPM'='responseBPM')
+  
+  my.prior=c(prior(normal(0,3),class='b')) 
+  
+  fits[[isession]]=brm(Decision.num ~ (heartBPM + soundBPM) + ((heartBPM + soundBPM)|ID),
+                       data=df.scaled.within.legrand,family=bernoulli(link='logit'),prior=my.prior)
+  
+  p=conditional_effects(fits[[isession]],effects=c('soundBPM','heartBPM'))
+  
+  plots[[paste0("sound.legrand.",isession)]]=plot(p,points = F, plot = F)[[1]]+theme_bw()+
+    ylab('Probability judge sound faster')+xlab('Sound rate (BPM)')
+  plots[[paste0("heart.legrand.",isession)]]=plot(p,points = F, plot = F)[[2]]+theme_bw()+
+    ylab('Probability judge sound faster')+xlab('Heart rate (BPM)')
+}
+
+
+
+
+plots.sound_heartRate.legrand=ggarrange(plots$sound.legrand.session1, plots$heart.legrand.session1,
+                                        plots$sound.legrand.session2, plots$heart.legrand.session2, 
+                                        nrow=2,ncol=2,
+                                        labels = c('A Sound session 1','B Heart rate session 1',
+                                                   'C Sound session 2','D Heart rate session 2'))
+ggexport(plots.sound_heartRate.legrand,
+         filename=file.path(paths$figures,'Supplements_Legrand_ConditionalEffects_heartAndSound_session1_session2.tiff'),
+         width=10*300,height=8*300,res=300)
+
+# print the results of the fits (tables to file)
+capture.output(summary(fits$session1),file=file.path(paths$stats,'Legrand_HierarchicalRegression_ConditionalEffects_heartAndSound_session1.txt'))
+capture.output(summary(fits$session2),file=file.path(paths$stats,'Legrand_HierarchicalRegression_ConditionalEffects_heartAndSound_session2.txt'))
+
+
+# same for participants on day 2 who could do it on day 1:
+IDs= results.legrand.day1 %>% dplyr::filter(rowname=='listenBPM' & Estimate<0) %>% pull(ID)
+df.scaled.within.legrand.selected= cardio.legrand.session2 %>% dplyr::filter(Modality=='Intero' & ID %in% IDs) %>%
+    dplyr::mutate(Decision.num = case_when(Decision=='More' ~1,
+                                           Decision=='Less' ~ 0)) %>%
+    dplyr::select(ID,Decision.num,listenBPM,responseBPM) %>%
+    group_by(ID) %>%
+    dplyr::mutate_at(c('listenBPM','responseBPM'),scale) %>%
+    dplyr::rename('heartBPM'='listenBPM','soundBPM'='responseBPM')
+fits.selected=brm(Decision.num ~ (heartBPM + soundBPM) + ((heartBPM + soundBPM)|ID),
+                     data=df.scaled.within.legrand.selected,family=bernoulli(link='logit'),prior=my.prior)
+capture.output(summary(fits.selected),file=file.path(paths$stats,'Legrand_HierarchicalRegression_ConditionalEffects_heartAndSound_session2_selectedParticipantsFromSession1.txt'))
+p.selected=conditional_effects(fits.selected,effects=c('soundBPM','heartBPM'))
+plots.selected.sound=plot(p.selected,points = F, plot = F)[[1]]+theme_bw()+
+  ylab('Probability judge sound faster')+xlab('Sound rate (BPM)') #+
+plots.selected.heart=plot(p,points = F, plot = F)[[2]]+theme_bw()+
+    ylab('Probability judge sound faster')+xlab('Heart rate (BPM)')
+plots.sound_heartRate.legrand.session2.selectedparticipants = ggarrange(plots.selected.sound,plots.selected.heart,nrow=1,
+                                                                        labels=c('A Sound session 2',
+                                                                                 'B Heart rate session 2'),title='Selected Participants')
+# and also other way round (select on day 2 for day 1)
+IDs= results.legrand.day2 %>% dplyr::filter(rowname=='listenBPM' & Estimate<0) %>% pull(ID)
+df.scaled.within.legrand.selected.day1= cardio.legrand %>% dplyr::filter(Modality=='Intero' & ID %in% IDs) %>%
+    dplyr::mutate(Decision.num = case_when(Decision=='More' ~1,
+                                           Decision=='Less' ~ 0)) %>%
+    dplyr::select(ID,Decision.num,listenBPM,responseBPM) %>%
+    group_by(ID) %>%
+    dplyr::mutate_at(c('listenBPM','responseBPM'),scale) %>%
+    dplyr::rename('heartBPM'='listenBPM','soundBPM'='responseBPM')
+fits.selected.day1=brm(Decision.num ~ (heartBPM + soundBPM) + ((heartBPM + soundBPM)|ID),
+                     data=df.scaled.within.legrand.selected.day1,family=bernoulli(link='logit'),prior=my.prior)
+capture.output(summary(fits.selected.day1),file=file.path(paths$stats,'Legrand_HierarchicalRegression_ConditionalEffects_heartAndSound_session1_selectedParticipantsFromSession2.txt'))
+
+p.selected.day1=conditional_effects(fits.selected.day1,effects=c('soundBPM','heartBPM'))
+plots.selected.sound.day1=plot(p.selected.day1,points = F, plot = F)[[1]]+theme_bw()+
+  ylab('Probability judge sound faster')+xlab('Sound rate (BPM)') #+
+plots.selected.heart.day1=plot(p.selected.day1,points = F, plot = F)[[2]]+theme_bw()+
+    ylab('Probability judge sound faster')+xlab('Heart rate (BPM)')
+plots.sound_heartRate.legrand.session1.selectedparticipants = ggarrange(plots.selected.sound.day1,plots.selected.heart.day1,nrow=1,
+                                                                        labels=c('A Sound session 1',
+                                                                                 'B Heart rate session 1'),title='Selected Participants')
+```
+
 
 

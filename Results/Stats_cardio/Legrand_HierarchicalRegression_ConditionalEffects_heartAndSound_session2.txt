@@ -1,0 +1,26 @@
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: Decision.num ~ (heartBPM + soundBPM) + ((heartBPM + soundBPM) | ID) 
+   Data: df.scaled.within.legrand (Number of observations: 9351) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Multilevel Hyperparameters:
+~ID (Number of levels: 192) 
+                        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)               0.53      0.05     0.43     0.63 1.00     1538     2613
+sd(heartBPM)                0.26      0.07     0.09     0.38 1.01      335      161
+sd(soundBPM)                0.86      0.09     0.69     1.04 1.00     1407     2305
+cor(Intercept,heartBPM)     0.02      0.21    -0.39     0.43 1.00     1708     1632
+cor(Intercept,soundBPM)     0.25      0.13    -0.01     0.50 1.00     1332     2283
+cor(heartBPM,soundBPM)     -0.22      0.20    -0.60     0.18 1.01      427      552
+
+Regression Coefficients:
+          Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept     0.45      0.05     0.34     0.55 1.00     2533     3005
+heartBPM     -0.10      0.04    -0.18    -0.03 1.00     3716     3085
+soundBPM      3.36      0.10     3.18     3.56 1.00     2451     3165
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
