@@ -125,6 +125,8 @@ cardio.legrand.session2 =cardio.legrand.unfiltered %>% dplyr::filter(HeartRateOu
 ```
 
 
+
+
 # Illustrations
 (Not so important for the paper)
 To look at data quality:
@@ -325,6 +327,17 @@ write.csv(t %>% dplyr::filter(rowname=="listenBPM"),file=file.path(paths$stats,'
 
 ```
 
+
+## Little control analysis: correlatyion between heart rate and sound
+```{r}
+df=cardio %>% dplyr::group_by(ID,session) %>% dplyr::filter(Modality=='Intero') %>%
+  dplyr::summarize(cor.heart.sound=cor(listenBPM,responseBPM),
+                   cor.heart.sound.past5= cor.test(rollingHeartAvg.5tr,rollingResponseAvg.5tr.prev)$estimate) %>%
+  dplyr::ungroup() %>% dplyr::group_by(session) %>% 
+  dplyr::summarize(cor.heart.sound=mean(cor.heart.sound,na.rm=T),
+                   cor.heart.sound.past5=mean(cor.heart.sound.past5,na.rm=T))
+
+```
 
 ##Analyse the regression weights
 Bayes factors to be done with JASP.
