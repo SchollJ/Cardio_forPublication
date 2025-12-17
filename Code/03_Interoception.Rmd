@@ -57,6 +57,8 @@ options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 library(brms) # regression models
 library(tableone) # make table
+library(lme4) # to compare Micah's results
+
 
 library(sjPlot) # makes tables of regression models
 library(readxl)
@@ -1863,4 +1865,213 @@ plots.sound_heartRate.legrand.session1.selectedparticipants = ggarrange(plots.se
 ```
 
 
+
+## Interaction + lme4
+
+> summary(fit.across.lme4)
+Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
+ Family: binomial  ( logit )
+Formula: Decision.num ~ (heartBPM * soundBPM) + ((heartBPM * soundBPM) |      ID)
+   Data: df.scaled.across.legrand
+Control: glmerControl(optCtrl = list(maxfun = 20000))
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+  13303.4   13409.6   -6637.7   13275.4     14471 
+
+Scaled residuals: 
+     Min       1Q   Median       3Q      Max 
+-10.8588  -0.5066   0.0021   0.5144  24.9501 
+
+Random effects:
+ Groups Name              Variance Std.Dev. Corr             
+ ID     (Intercept)       3.7185   1.9283                    
+        heartBPM          0.2792   0.5284    0.02            
+        soundBPM          1.3446   1.1596    0.28 -0.40      
+        heartBPM:soundBPM 0.1272   0.3566   -0.29 -0.22 -0.46
+Number of obs: 14485, groups:  ID, 218
+
+Fixed effects:
+                  Estimate Std. Error z value Pr(>|z|)    
+(Intercept)        0.30600    0.13908   2.200  0.02779 *  
+heartBPM          -0.17167    0.07623  -2.252  0.02431 *  
+soundBPM           3.31355    0.10480  31.618  < 2e-16 ***
+heartBPM:soundBPM -0.25295    0.09386  -2.695  0.00704 ** 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) hrtBPM sndBPM
+heartBPM     0.026              
+soundBPM     0.219 -0.212       
+hrtBPM:sBPM -0.053  0.109 -0.121
+optimizer (Nelder_Mead) convergence code: 0 (OK)
+Model failed to converge with max|grad| = 0.0493458 (tol = 0.002, component 1)
+
+-> It can't just be the scaling across, his p-values are still a lot more significant.
+
+
+summary(fit.within.lme4)
+Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
+ Family: binomial  ( logit )
+Formula: Decision.num ~ (heartBPM * soundBPM) + ((heartBPM * soundBPM) |      ID)
+   Data: df.scaled.within.legrand
+Control: glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e+05))
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+  12755.3   12861.4   -6363.6   12727.3     14471 
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-7.8709 -0.4939  0.0018  0.5016 10.7611 
+
+Random effects:
+ Groups Name              Variance Std.Dev. Corr             
+ ID     (Intercept)       0.16923  0.4114                    
+        heartBPM          0.03944  0.1986   -0.07            
+        soundBPM          0.90545  0.9516    0.29 -0.26      
+        heartBPM:soundBPM 0.09387  0.3064    0.01  0.49  0.07
+Number of obs: 14485, groups:  ID, 218
+
+Fixed effects:
+                  Estimate Std. Error z value Pr(>|z|)    
+(Intercept)        0.09940    0.03787   2.625  0.00867 ** 
+heartBPM           0.01934    0.02948   0.656  0.51177    
+soundBPM           2.52886    0.08034  31.476  < 2e-16 ***
+heartBPM:soundBPM -0.04419    0.05042  -0.876  0.38078    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) hrtBPM sndBPM
+heartBPM    -0.039              
+soundBPM     0.206 -0.185       
+hrtBPM:sBPM -0.054  0.126  0.007
+
+
+> summary(fit.across.lme4.noMixed)
+Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
+ Family: binomial  ( logit )
+Formula: Decision.num ~ (heartBPM * soundBPM) + (1 | ID)
+   Data: df.scaled.across.legrand
+Control: glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 20000))
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+  13889.5   13927.4   -6939.7   13879.5     14480 
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-104.62   -0.53    0.01    0.55  822.17 
+
+Random effects:
+ Groups Name        Variance Std.Dev.
+ ID     (Intercept) 3.552    1.885   
+Number of obs: 14485, groups:  ID, 218
+
+Fixed effects:
+                  Estimate Std. Error z value Pr(>|z|)    
+(Intercept)        0.08617    0.13019   0.662   0.5080    
+heartBPM          -0.10488    0.05341  -1.964   0.0496 *  
+soundBPM           2.87914    0.05239  54.957   <2e-16 ***
+heartBPM:soundBPM -0.10178    0.04047  -2.515   0.0119 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) hrtBPM sndBPM
+heartBPM    -0.002              
+soundBPM     0.011 -0.234       
+hrtBPM:sBPM -0.102 -0.041 -0.038
+-> it's not that they left out the mixed effeccts.
+
+> summary(fit.within.lme4.noMixed)
+Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
+ Family: binomial  ( logit )
+Formula: Decision.num ~ (heartBPM * soundBPM) + (1 | ID)
+   Data: df.scaled.within.legrand
+Control: glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 20000))
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+  13179.0   13216.9   -6584.5   13169.0     14480 
+
+Scaled residuals: 
+     Min       1Q   Median       3Q      Max 
+-100.991   -0.519    0.007    0.528  143.154 
+
+Random effects:
+ Groups Name        Variance Std.Dev.
+ ID     (Intercept) 0.1665   0.408   
+Number of obs: 14485, groups:  ID, 218
+
+Fixed effects:
+                  Estimate Std. Error z value Pr(>|z|)    
+(Intercept)        0.06346    0.03556   1.785   0.0743 .  
+heartBPM          -0.01001    0.02347  -0.426   0.6699    
+soundBPM           2.25799    0.03967  56.924   <2e-16 ***
+heartBPM:soundBPM -0.08480    0.03719  -2.280   0.0226 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) hrtBPM sndBPM
+heartBPM    -0.020              
+soundBPM     0.031 -0.234       
+hrtBPM:sBPM -0.128 -0.005 -0.057
+-> it's not within, but without mixed effects
+
+
+Comparing the data:
+218 people, 14485 observations
+Them: 218 people, 10772 observations (-> they excluded 25% of trials) - did they remove the catch trials?
+
+```{r}
+
+legrand.this=cardio.legrand
+
+legrand.this.noCatchTrials=
+
+df.scaled.within.legrand= legrand.this %>% dplyr::filter(Modality=='Intero') %>%
+  dplyr::mutate(Decision.num = case_when(Decision=='More' ~1,
+                                         Decision=='Less' ~ 0)) %>%
+  dplyr::select(ID,Decision.num,listenBPM,responseBPM) %>%
+  group_by(ID) %>%
+  dplyr::mutate_at(c('listenBPM','responseBPM'),scale) %>%
+  dplyr::rename('heartBPM'='listenBPM','soundBPM'='responseBPM')
+
+my.prior=c(prior(normal(0,3),class='b')) 
+
+fit=brm(Decision.num ~ (heartBPM*soundBPM) + ((heartBPM *soundBPM)|ID),
+                     data=df.scaled.within.legrand,family=bernoulli(link='logit'),prior=my.prior)
+
+# scaled across, just in case
+df.scaled.across.legrand= legrand.this %>% dplyr::filter(Modality=='Intero') %>%
+  dplyr::mutate(Decision.num = case_when(Decision=='More' ~1,
+                                         Decision=='Less' ~ 0)) %>%
+  dplyr::select(ID,Decision.num,listenBPM,responseBPM) %>%
+  ungroup() %>%
+  dplyr::mutate_at(c('listenBPM','responseBPM'),scale) %>%
+  dplyr::rename('heartBPM'='listenBPM','soundBPM'='responseBPM')
+
+my.prior=c(prior(normal(0,3),class='b')) 
+
+fit.across=brm(Decision.num ~ (heartBPM*soundBPM) + ((heartBPM *soundBPM)|ID),
+                     data=df.scaled.across.legrand,family=bernoulli(link='logit'),prior=my.prior)
+
+# I think he used LME4:
+fit.across.lme4=glmer(Decision.num ~ (heartBPM*soundBPM) + ((heartBPM *soundBPM)|ID),
+                     data=df.scaled.across.legrand,family = binomial,control=glmerControl(optCtrl=list(maxfun=2e4)))
+
+
+fit.within.lme4=glmer(Decision.num ~ (heartBPM*soundBPM) + ((heartBPM *soundBPM)|ID),
+                     data=df.scaled.within.legrand,family = binomial,control=glmerControl(optCtrl=list(maxfun=2e5)))  #
+
+# to try:
+# leave out mixed effects for across
+fit.across.lme4.noMixed=glmer(Decision.num ~ (heartBPM*soundBPM) + (1|ID),
+                     data=df.scaled.across.legrand,family = binomial,control=glmerControl(optimizer = "bobyqa",optCtrl=list(maxfun=2e4)))
+
+# leave out mixed effects for within
+fit.within.lme4.noMixed=glmer(Decision.num ~ (heartBPM*soundBPM) + (1|ID),
+                     data=df.scaled.within.legrand,family = binomial,control=glmerControl(optimizer = "bobyqa",optCtrl=list(maxfun=2e4)))
+
+```
 

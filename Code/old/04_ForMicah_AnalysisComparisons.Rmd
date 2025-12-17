@@ -1,0 +1,120 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+# Libraries, paths, data
+Here we will just analyse Legrand's 2022 data to check for differences in results that I and Micah/his team got.
+
+```{r}
+# Paths
+rm(list=ls())
+paths=list(base.path='/Users/jacquelinescholl/Documents/Experiments/Tim_Palmer/Cardio_forPublication')
+paths$out=file.path(paths$base.path,'Results','ForMicah')
+# Libraries
+library(tidyverse)
+library("rstan") # observe startup messages
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+library(brms) # regression models
+library(lme4) # to compare Micah's results
+library(glmmTMB)# the pacakge Micah used
+
+# Load session 1 Legrand and save as single text file for comparison for Micah
+folders=list.files(file.path(paths$base.path,'Data','CardioceptionPaper-main','data','raw','HRD'),full.names = T)
+cardio.legrand.unfiltered= data.frame()
+for (ifold in folders){
+  ID=stringr::str_split(ifold,'/')[[1]][length(stringr::str_split(ifold,'/')[[1]])]
+  cardio.legrand.unfiltered=rbind(cardio.legrand.unfiltered,
+                                  read.csv(file.path(ifold,'filtered.txt')) %>% dplyr::mutate(ID=ID))
+}
+cardio.legrand =cardio.legrand.unfiltered %>% dplyr::filter(HeartRateOutlier=='False') %>% dplyr::filter(Decision!="")
+write.csv(cardio.legrand,
+          file=file.path(paths$out,'Cardio_Legrand2022_Session1_FilteredForMicah.csv'),
+          row.names = F)
+
+```
+
+#Preprocess the data
+Size:
+Unique IDs: 218
+Total rows: 31882
+Rows in intero condition: 14485
+```{r}
+cardio.legrand=read.csv(file.path(paths$out,'Cardio_Legrand2022_Session1_FilteredForMicah.csv'))
+length(unique(cardio.legrand$ID)) # 218
+nrow(cardio.legrand) #31882
+nrow(cardio.legrand %>% dplyr::filter(Modality=='Intero')) #14485
+
+cardio.legrand.intero.scaledWithinSubj = cardio.legrand %>% dplyr::filter(Modality=="Intero") %>%
+  dplyr::group_by(ID) %>% 
+  dplyr::mutate_at(vars(listenBPM,responseBPM),~scale(.) %>% as.vector()) %>%
+  dplyr::mutate(Response.numeric = case_when(
+    Decision=="More" ~ 1,
+    Decision=="Less" ~ 0
+  )) 
+cardio.legrand.intero.scaledBetweenSubj = cardio.legrand %>% dplyr::filter(Modality=="Intero") %>%
+  dplyr::mutate_at(vars(listenBPM,responseBPM),~scale(.) %>% as.vector()) %>%
+  dplyr::mutate(Response.numeric = case_when(
+    Decision=="More" ~ 1,
+    Decision=="Less" ~ 0
+  )) 
+```
+
+
+#Hierarchical regression analyses 
+## Response.numeric ~ listenBPM+responseBPM + (listen+responseBPM|ID)
+```{r}
+fit.brms.modelLinear = brm(Response.numeric~ listenBPM + responseBPM + (listenBPM + responseBPM | ID),
+                            data=cardio.legrand.intero.scaledWithinSubj,
+                            family=bernoulli(link='logit'),
+                            prior=c(prior(normal(0,3),class='b')),
+                            iter=10000,warmup=5000,
+                            chains=4,cores=4)
+fit.lme.modelLinear= lme4=glmer(Response.numeric~ listenBPM + responseBPM + (listenBPM + responseBPM | ID),
+                     data=cardio.legrand.intero.scaledWithinSubj,family = binomial,control=glmerControl(optCtrl=list(maxfun=2e4)))
+fit.glmmTMB.modelLindear=glmmTMB(
+  Response.numeric~ listenBPM + responseBPM + (listenBPM + responseBPM | ID),
+  data = cardio.legrand.intero.scaledWithinSubj,
+  family = binomial(link = "logit"),
+  control = glmmTMBControl(parallel = 4) 
+)
+
+```
+## Response.numeric ~ listenBPM*responseBPM + (listen*responseBPM|ID)
+```{r}
+fit.brms.modelInteract= brm(Response.numeric~ listenBPM * responseBPM + (listenBPM * responseBPM | ID),
+                            data=cardio.legrand.intero.scaledWithinSubj,
+                            family=bernoulli(link='logit'),
+                            prior=c(prior(normal(0,3),class='b')),
+                            iter=10000,warmup=5000,
+                            chains=4,cores=4)
+fit.lme.modelInteract= lme4=glmer(Response.numeric ~ (listenBPM*responseBPM) + ((listenBPM * responseBPM)|ID),
+                     data=cardio.legrand.intero.scaledWithinSubj,family = binomial,control=glmerControl(optCtrl=list(maxfun=2e4)))
+fit.glmmTMB.modelInteract=glmmTMB(
+  Response.numeric ~ (listenBPM*responseBPM) + ((listenBPM *responseBPM)|ID),
+  data = cardio.legrand.intero.scaledWithinSubj,
+  family = binomial(link = "logit"),
+  control = glmmTMBControl(parallel = 4) 
+)
+```
+
+# Wrong analysis: not individual subject effects for interactions
+```{r}
+
+fit.glmmTMB.modelInteract.wrong=glmmTMB(
+  Response.numeric ~ (listenBPM*responseBPM) + (listenBPM +responseBPM|ID),
+  data = cardio.legrand.intero.scaledWithinSubj,
+  family = binomial(link = "logit"),
+  control = glmmTMBControl(parallel = 4) 
+)
+
+fit.glmmTMB.modelInteract.wrong.BetweenSubjZscore=glmmTMB(
+  Response.numeric ~ (listenBPM*responseBPM) + (listenBPM +responseBPM|ID),
+  data = cardio.legrand.intero.scaledBetweenSubj,
+  family = binomial(link = "logit"),
+  control = glmmTMBControl(parallel = 4) 
+)
+
+
+```
+
