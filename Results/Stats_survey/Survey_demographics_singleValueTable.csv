@@ -1,0 +1,30 @@
+"","ID","Education","Trauma","this.session.type","Age","Sex","order","NDM_use","CDM_use","ADM_use","Employment","Mental.Health","Meditation duration (years)"
+"1","s12","Bachelor's degree",5,"Pre",54,"Male","NDM.first",5.2,6.6,4.8,"Self-employed","None",3.16666666666667
+"2","s02","Master's degree",0,"Pre",26,"Female","CDM.first",2.6,4.4,5,"Student","None",10
+"3","s18","Master's degree",5,"Pre",66,"Female","NDM.first",0,1.6,0.4,"Retired","None",3.5
+"4","s09","College 16-18 years A-Levels",3,"Pre",18,"Male","NDM.first",4,6.6,3.4,"Student","None",0.5
+"5","s04","Bachelor's degree",4,"Pre",31,"Male","NDM.first",1.8,3,3.6,"Self-employed","None",7
+"6","s08","Some university 18+, no degree",8,"Pre",47,"Female","CDM.first",2,6,3.8,"Employed","Personality disorder",3
+"7","s23","Some university 18+, no degree",8,"Pre",18,"Female","CDM.first",1,1.8,1.6,"Student","None",0.25
+"8","s26","Doctorate",6,"Pre",32,"Female","NDM.first",0,0.8,0.4,"Homemaker","None",0.916666666666667
+"9","s24","Some university 18+, no degree",7,"Pre",19,"Female","CDM.first",0,6.2,1.2,"Student","None",0.0833333333333333
+"10","s07","Bachelor's degree",7,"Pre",22,"Female","NDM.first",0,0.4,0.4,"Student","None",0.0833333333333333
+"11","s19","Master's degree",4,"Pre",31,"Female","NDM.first",0,6,1.8,"Employed","None",8.83333333333333
+"12","s05","Some university 18+, no degree",4,"Pre",19,"Male","CDM.first",0.6,1,0.4,"Student","None",0
+"13","s16","Bachelor's degree",3,"Pre",37,"Female","NDM.first",0,1.6,1.2,"Employed","None",2.16666666666667
+"14","s15","Doctorate",4,"Pre",37,"Male","CDM.first",3.2,8.8,1.8,"Employed","None",20
+"15","s14","Master's degree",0,"Pre",27,"Male","NDM.first",4.6,6.6,4,"Student","None",10.9166666666667
+"16","s21","Master's degree",7,"Pre",40,"Female","CDM.first",2,6.6,2.2,"Unemployed","None",1.25
+"17","s01","Master's degree",2,"Pre",52,"Female","CDM.first",4.8,1.2,3,"Self-employed","Depression",23
+"18","s22","Bachelor's degree",2,"Pre",37,"Female","CDM.first",3.2,2.8,3.2,"Employed","None",2
+"19","s10","Some university 18+, no degree",8,"Pre",40,"Female","CDM.first",0.4,5.6,5,"Self-employed","None",7.08333333333333
+"20","s17","Bachelor's degree",0,"Pre",72,"Male","NDM.first",NA,NA,NA,"Retired","None",42
+"21","s27","Master's degree",2,"Pre",24,"Female","NDM.first",0.6,6,1.6,"Student","None",1
+"22","s29","Master's degree",1,"Pre",59,"Female","CDM.first",0,3.4,0.6,"Employed","None",3
+"23","s03","Trade or vocational",2,"Pre",37,"Female","CDM.first",2.6,6,4.4,"Employed","None",5.5
+"24","s28","Some university 18+, no degree",0,"Pre",19,"Male","CDM.first",0,2.4,0,"Student","None",0.166666666666667
+"25","s20","Master's degree",0,"Pre",30,"Female","NDM.first",0,2.2,1.8,"Student","None",9.16666666666667
+"26","s11","Doctorate",3,"Pre",31,"Female","CDM.first",0.4,4.4,1.8,"Employed","None",4
+"27","s13","College 16-18 years A-Levels",8,"Pre",46,"Female","CDM.first",1,3.6,3,"Unemployed","PTSD",5.08333333333333
+"28","s06","Doctorate",0,"Pre",46,"Male","NDM.first",0.6,4,0,"Employed","None",7.08333333333333
+"29","s25","Trade or vocational",3,"Pre",43,"Female","NDM.first",2.8,6.2,3.2,"Self-employed","None",3.08333333333333

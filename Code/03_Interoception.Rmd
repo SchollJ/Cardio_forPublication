@@ -78,6 +78,8 @@ cardio.unfiltered=files %>% lapply(., read.csv) %>% do.call(rbind,.) %>% as.data
 # load age, gender, which session was first for them (CDM or NDM)
 med.data= read.csv(file.path(paths$base.path,'Data','','Online_survey_forPublication.csv'))   %>%
   dplyr::select(ID,order) %>% distinct()
+med.data.revision =  read.csv(file=file.path(paths$base.path,'Results','Stats_survey','Survey_demographics_singleValueTable.csv'))  
+
 cardio.unfiltered = left_join(cardio.unfiltered,med.data,by='ID') %>% # checked, this works
   # detect RT outliers
   # 19/9/2025 correcting error here: had not grouped before computing the rolling average, which mixed up extero and intero condition
@@ -234,14 +236,23 @@ Control analyses:
 - heart and sound separately
 - basic, non-zscored (for plotting)
 - for log likelihoods: use non-zscored
+
+
+Added for revision: age, sex, meditation years, types of meditation amount
+
 ```{r}
 results.indivModalities=data.frame()
 results.indivModalities.notScaled.forPlot=data.frame()
 results.logLiks = data.frame()
 
-cardio.scaled=cardio %>% dplyr::ungroup() %>%
+cardio.scaled=cardio %>% 
+  dplyr::ungroup() %>%
   dplyr::mutate_at(vars(c('DV_ResponseMinListen','easiness_ResponseMinListen.abs','DecisionRT','Confidence',
                           'listenBPM','listen.responseBPM.mean','responseBPM','rollingHeartAvg.5tr','rollingResponseAvg.5tr.prev')),scale)
+
+
+
+
 for (isub in unique(cardio$ID)){
   dft=cardio.scaled %>% dplyr::filter(ID==isub) %>%
     dplyr::mutate(Decision = dplyr::recode(Decision,'More'=1,'Less'=0))
@@ -393,6 +404,8 @@ for (itype in unique(results.indivModalities$regression)){
     for (imodality in c('Intero','Extero')){
       df = dft %>% dplyr::filter(rowname==ibeta) %>% dplyr::select(order,contains(imodality),ID)
       
+      df_revision = left_join(df,med.data.revision %>% dplyr::select(-X,-order),by='ID')
+      
       # compute for each of CDM and NDM a t-test against zero (one-sample,two-sided)
       main.effects.p= df %>%  dplyr::select(-contains('CDMmNDM'),-contains('CDMandNDM')) %>%
         pivot_longer(cols=contains(imodality),names_to='session',values_to='value') %>%
@@ -433,6 +446,17 @@ for (itype in unique(results.indivModalities$regression)){
                       `Std. Error.CDMmNDM.ctrHRmean`=`Std. Error`, 
                       `t value.CDMnNDM.ctrHRmean` = `t value`,
                       `Pr(>|t|).CDMmNDM.ctrHRmean`=`Pr(>|t|)`)
+      
+      # contro analyses from revision:
+      this.lm=lm(formula=paste0(imodality,'_CDMmNDM~ 1+order+Age+Sex+NDM_use+CDM_use+ADM_use+Meditation.duration..years.'),data = df_revision)
+      stats.summary.controlDemogr=as.data.frame(summary(this.lm)$coefficients) %>% rownames_to_column(var='group.level.reg') %>% 
+        # dplyr::recode group.level.reg (Intercept) with NDM min CDM
+        dplyr::mutate(group.level.reg=dplyr::recode(group.level.reg,`(Intercept)`='CDMminNDM')) %>% 
+        dplyr::rename( Estimate.CDMmNDM.ctrDemogr=Estimate, 
+                      `Std. Error.CDMmNDM.ctrDemogr`=`Std. Error`, 
+                      `t value.CDMnNDM.ctrDemogr` = `t value`,
+                      `Pr(>|t|).CDMmNDM.ctrDemogr`=`Pr(>|t|)`)
+      
       # The same, but for HR SD
       t= left_join(df,heart.rates.mean.sd %>% dplyr::select(ID,heartRate.sd_cdm_min_ndm),by='ID')
       this.lm= lm(formula=paste0(imodality,'_CDMmNDM~ 1+order+heartRate.sd_cdm_min_ndm'),data=t) 
@@ -444,6 +468,10 @@ for (itype in unique(results.indivModalities$regression)){
                       `t value.CDMnNDM.ctrHRsd` = `t value`,
                       `Pr(>|t|).CDMmNDM.ctrHRsd`=`Pr(>|t|)`)
      
+      
+      
+      #### CONTINUE HERE!!!!! ########
+      
       # join what we computed above to later print to file
       this.stats.complete= cbind(main.effects,
                                  main.effects.groupsCombined,
@@ -461,7 +489,9 @@ for (itype in unique(results.indivModalities$regression)){
                       heartRate.sd_cdm_min_ndm.p =  stats.summary.controlSDHR %>% 
                         dplyr::filter(group.level.reg=="heartRate.sd_cdm_min_ndm") %>% pull(`Pr(>|t|).CDMmNDM.ctrHRsd`),
                       CDMmNDM.ctrHRsd.p =  stats.summary.controlSDHR %>% dplyr::filter(group.level.reg=="CDMminNDM") %>% pull(`Pr(>|t|).CDMmNDM.ctrHRsd`),
-                      CDMmNDM.ctrHRsd.estimate =  stats.summary.controlSDHR %>% dplyr::filter(group.level.reg=="CDMminNDM") %>% pull(Estimate.CDMmNDM.ctrHRsd))
+                      CDMmNDM.ctrHRsd.estimate =  stats.summary.controlSDHR %>% dplyr::filter(group.level.reg=="CDMminNDM") %>% pull(Estimate.CDMmNDM.ctrHRsd),
+                      CDMmNDM.ctrDemogr.p = stats.summary.controlDemogr %>% dplyr::filter(group.level.reg=="CDMminNDM") %>% pull(`Pr(>|t|).CDMmNDM.ctrDemogr`),
+                      CDMmNDM.ctrDemogr.estimate = stats.summary.controlDemogr %>% dplyr::filter(group.level.reg=="CDMminNDM") %>% pull(Estimate.CDMmNDM.ctrDemogr))
       session.comparisons=rbind(session.comparisons,this.stats.complete) 
       
       
@@ -469,7 +499,7 @@ for (itype in unique(results.indivModalities$regression)){
   }
 }
 
-write.csv(session.comparisons,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_fitSingleSub.csv'))
+write.csv(session.comparisons,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_fitSingleSub_revision.csv')) # same as without_revision but with the new revision analyses
 
 ```
 # Figures for the paper
@@ -769,12 +799,12 @@ ggexport(figure,filename=file.path(paths$figures,'FigureMain_Interoception_Regre
 
 # Print the results as tables for main text and supplements
 ```{r}
-session.comparisons=read.csv(file.path(paths$stats,'Interoception_NDMCDMcomparisons_fitSingleSub.csv'))
+session.comparisons=read.csv(file.path(paths$stats,'Interoception_NDMCDMcomparisons_fitSingleSub_revision.csv')) # new 22/7/26
 # main text: Intero/Extero, decision/confidence, against zero (CDM and NDM separately), comparing NDM vs CDM (estimate (se.); p-value, BF), order effects
 main=session.comparisons %>% 
   dplyr::select(Modality,analysis.type,Subject.level.regression.weight,contains('.mainEffect'),
                 Estimate__CDMminNDM,Std..Error__CDMminNDM,Pr...t..__CDMminNDM,Estimate__orderNDM.first,Std..Error__orderNDM.first,Pr...t..__orderNDM.first,
-                CDMmNDM.ctrHRmean.p,CDMmNDM.ctrHRsd.p) %>%  #BF.mean.customSD
+                CDMmNDM.ctrHRmean.p,CDMmNDM.ctrHRsd.p, CDMmNDM.ctrDemogr.p) %>%  #BF.mean.customSD
   dplyr::mutate("CDM min NDM, mean(s.e.)"=paste0(round(Estimate__CDMminNDM,digits=2),' (',round(Std..Error__CDMminNDM,digits=1),')'),
                 "CDM min NDM (p)"=case_when(Pr...t..__CDMminNDM<0.01 ~ round(Pr...t..__CDMminNDM,digits=3),    #"NDM vs CDM (p)"
                                 T ~ round(Pr...t..__CDMminNDM,digits=2)),
@@ -784,6 +814,9 @@ main=session.comparisons %>%
                 'CDM minNDM, ctr HR sd (p)' = case_when(CDMmNDM.ctrHRsd.p<0.001 ~ '<0.001',
                                                      CDMmNDM.ctrHRsd.p<0.01 ~ as.character(round(CDMmNDM.ctrHRsd.p,digits=3)),
                                                      T~ as.character(round(CDMmNDM.ctrHRsd.p,digits=2))),
+                'CDM minNDM, ctr Demogr (p)' = case_when(CDMmNDM.ctrDemogr.p<0.001 ~ '<0.001',
+                                                     CDMmNDM.ctrDemogr.p<0.01 ~ as.character(round(CDMmNDM.ctrDemogr.p,digits=3)),
+                                                     T~ as.character(round(CDMmNDM.ctrDemogr.p,digits=2))),
                 "Order [NDM first], mean(s.e.)" =paste0(round(Estimate__orderNDM.first,digits=2),' (',round(Std..Error__orderNDM.first,digits=1),')'),
                 "Order [NDM first] (p)" = case_when(Pr...t..__orderNDM.first<0.01 ~ round(Pr...t..__orderNDM.first,digits=3),
                                 T ~ round(Pr...t..__orderNDM.first,digits=2)),
@@ -834,7 +867,7 @@ main=session.comparisons %>%
   
   
 t=main %>% dplyr::select(-contains('one-sample'))
-write.csv(main,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_mainText.csv'))
+write.csv(main,file=file.path(paths$stats,'Interoception_NDMCDMcomparisons_mainText_revision.csv')) #22/7/26
 
 main.table1= main %>% dplyr::filter(analysis.type %in% c('dec','conf')) %>% 
   dplyr::select(-c(`CDM&NDM (p,one-sample)`,`CDM minNDM, ctr HR mean (p)`,`CDM minNDM, ctr HR sd (p)`, `CDM (estimate)`,`NDM (estimate)`,`CDM&NDM (estimate)`,`CDM (p, one-sample)`,`NDM (p, one-sample)`))
@@ -844,7 +877,7 @@ main.table.control = main %>% dplyr::filter(analysis.type %in% c('dec.withAvgLis
   dplyr::select(-c(`CDM&NDM (p,one-sample)`,`CDM&NDM (estimate)`,`CDM min NDM, mean(s.e.)`,`Order [NDM first], mean(s.e.)`,`CDM (p, one-sample)`,`NDM (p, one-sample)`)) 
 
 new.suppl.withoutConf = main %>% dplyr::filter(analysis.type %in% c('dec','dec.listenRespBPMsep','dec.soundPastsound5tr','dec.soundHeart5trPastsound5tr','dec.soundHeart5tr')) %>%
-  relocate(Modality,analysis.type,Subject.level.regression.weight,`CDM&NDM (estimate)`,`CDM&NDM (p,one-sample)`,`CDM min NDM, mean(s.e.)`,`CDM min NDM (p)`,`CDM minNDM, ctr HR mean (p)`,`CDM minNDM, ctr HR sd (p)`) %>%
+  relocate(Modality,analysis.type,Subject.level.regression.weight,`CDM&NDM (estimate)`,`CDM&NDM (p,one-sample)`,`CDM min NDM, mean(s.e.)`,`CDM min NDM (p)`,`CDM minNDM, ctr HR mean (p)`,`CDM minNDM, ctr HR sd (p)`,`CDM minNDM, ctr Demogr (p)`) %>%
   dplyr::arrange(desc(Modality),analysis.type)
   
 
@@ -2075,3 +2108,6 @@ fit.within.lme4.noMixed=glmer(Decision.num ~ (heartBPM*soundBPM) + (1|ID),
 
 ```
 
+
+
+# Revision: control for age, sex, meditation years and type of meditation

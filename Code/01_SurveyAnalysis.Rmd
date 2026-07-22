@@ -14,7 +14,7 @@ Explanations for missing data for cardio:
 ```{r}
 rm(list=ls())
 
-paths=list(base.path='/Users/jacquelinescholl/Documents/Experiments/Tim_Palmer/FMRI_study/Cardio_publication')
+paths=list(base.path='/Users/jacquelinescholl/Documents/Experiments/Tim_Palmer/Cardio_forPublication')
 paths$figures=file.path(paths$base.path,'Results','Figures_survey')
 paths$stats=file.path(paths$base.path,'Results','Stats_survey')
 
@@ -143,6 +143,7 @@ for (is in unique(df$ID)){
   }
   df.singleValue =bind_rows(df.singleValue,df.sub)
 }
+write.csv(df.singleValue,file=file.path(paths$stats,'Survey_demographics_singleValueTable.csv'))  
 
 
 
@@ -557,3 +558,94 @@ ggexport(p,filename =file.path(paths$figures,'Survey_Cape_Mystical_Interoception
 
 
 
+
+
+
+# Reviewer requests during revision
+"I think that any analyses should be corrected for age, years of practice, specific meditation practiced"
+Questionnaires:
+- statistical tests table S2 (illustrated in figure 3 main text)
+
+Results:
+[1] including all covariates (age, sex, meditation duration, NDM, CDM, ADM use): 
+-ThisQ_Cardiorespiratory_Activation_s_CDMminNDM, p of intercept now: 0.041, esimate: -2.41
+- MAIA_Body_Listening_s_CDMminNDM , p of intercept: 0.043 estimate: -1.98
+[2] controlling for age and sex:
+- ThisQ_Cardiorespiratory_Activation_s_CDMminNDM p=0.025
++ looked trhoguh all: it's the inclusion of age and sex that has this effect
+```{r}
+df.wide=read.csv(file=file.path(paths$base.path,'Data','Survey_wide_subcales.csv'))
+# add age, sex, years of practice, specific meditation practice (their CDM and NDM scores)
+df.demographics = read.csv(file=file.path(paths$stats,'Survey_demographics_singleValueTable.csv'))  
+
+df= left_join(df.wide,df.demographics %>% dplyr::select(ID,contains('use'),Meditation.duration..years.),by=c('ID')) %>% dplyr::select(-X)
+
+
+overwrite=F
+subscales = stringr::str_remove_all(colnames(df.wide %>% dplyr::select(contains('CDMminNDM'))),'_CDMminNDM')
+
+models.file=file.path(paths$base.path,'Data_preprocessed','Surveys_regressions','Survey_models_controlAnalyses.RData')
+if (!file.exists(models.file)|overwrite==T){
+  this.scaled='scaled'
+  all.bfs=data.frame()
+  #Wide models
+  models.wide.byM= list()
+  models.wide.bySubsc= list()
+  for (isc in setdiff(subscales,'CAPE_Perceptual_Anomalies_s')){
+    
+    dfT = df %>% dplyr::select(contains(isc),Sex,Age,order,ID,Meditation.duration..years.,contains('_use')) %>% na.omit() %>%
+        dplyr::mutate_at(vars(Age,Meditation.duration..years.,contains('use')),scale)
+  
+    models.wide.bySubsc[[isc]] = list()
+    models.wide.bySubsc[[isc]]$orderAgeSexMeditExpTypes = lm(formula=paste0(isc,'_CDMminNDM~1+order+Age+Sex+Meditation.duration..years.+NDM_use+CDM_use+ADM_use'),data=dfT)
+    models.wide.bySubsc[[isc]]$orderAgeSex = lm(formula=paste0(isc,'_CDMminNDM~1+order+Age+Sex'),data=dfT)
+    models.wide.bySubsc[[isc]]$orderMeditExp = lm(formula=paste0(isc,'_CDMminNDM~1+order+Meditation.duration..years.'),data=dfT)
+    models.wide.bySubsc[[isc]]$orderMeditTypes = lm(formula=paste0(isc,'_CDMminNDM~1+order+NDM_use+CDM_use+ADM_use'),data=dfT)
+
+
+                                                           
+    # The same models, but reordered for making easy tables
+    models.wide.byM$orderAgeSexMeditExpTypes[[isc]]  = models.wide.bySubsc[[isc]]$orderAgeSexMeditExpTypes 
+    models.wide.byM$orderAgeSex[[isc]]               = models.wide.bySubsc[[isc]]$orderAgeSex 
+    models.wide.byM$orderMeditExp[[isc]]             = models.wide.bySubsc[[isc]]$orderMeditExp 
+    models.wide.byM$orderMeditTypes[[isc]]           = models.wide.bySubsc[[isc]]$orderMeditTypes 
+    
+
+    # Print files
+    
+  }
+  for (itype in setdiff(names(models.wide.byM),'orderOnly_BF')){
+    print(tab_model(models.wide.byM[[itype]],file=file.path(paths$stats,paste0('Survey_wideModels_allSubscales__',itype,'_reviewerAnalyses.html'))))
+  }
+  for (itype in names(models.wide.bySubsc)){
+    t=models.wide.bySubsc[[itype]]
+    t=t[names(t) != "orderOnly_BF"]
+                
+    print(tab_model(t,file=file.path(paths$stats,paste0('Survey_wideModels_allTypes__',itype,'_reviewerAnalyses.html'))))
+  }
+  out= list(models.wide.byM=models.wide.byM,models.wide.bySubsc=models.wide.bySubsc)
+  save(out,models.wide.bySubsc,file=models.file)
+} else{
+  load(models.file)
+  models.wide.byM=out$models.wide.byM
+  models.wide.bySubsc=out$models.wide.bySubsc
+}
+
+p.values = as.data.frame(sapply(models.wide.byM$orderAgeSexMeditExpTypes, function(x) summary(x)$coefficients[,4])) %>% rownames_to_column() %>%
+  pivot_longer(cols = -c(rowname), names_to = 'quest') %>% pivot_wider(names_from = c(rowname), values_from = value) %>% 
+  dplyr::rename(Int.p = `(Intercept)`, order.p= orderNDM.first)
+# append results to table from manuscript
+intervention.comparison.table_revision=read.csv(file.path(paths$stats,'Survey_Paper_means_stats.csv'))
+t= left_join(intervention.comparison.table_revision,
+             p.values %>% dplyr::select(quest,Int.p) %>% dplyr::rename(Int.p_controls=Int.p),by='quest') %>%
+  # round 2 digits for printing
+  dplyr::mutate(Int.p_controls = case_when(Int.p_controls<0.01 ~ format(round(Int.p_controls,digits=3), nsmall = 3),
+                                   T ~ format(round(Int.p_controls,digits=2), nsmall = 2))) %>% 
+  dplyr::select(-X) %>%
+  # rename to make look nice
+  dplyr::rename(`quest subscale`=quest, `CDM, session 1` = CDM..session.1, `NDM, session 1`=NDM..session.1,`CDM, session 2`=CDM..session.2,`NDM, session 2`=NDM..session.2,
+                `CDM min NDM, mean (s.e.)`=NDM.vs.CDM..mean.s.e.., `CDM min NDM (p)`=NDM.vs.CDM..p.,
+                `Order [NDM first], mean(s.e.)`=Order..NDM.first...mean.s.e..,`Order [NDM first] (p)`=Order..NDM.first...p.,
+                `CDM min NDM (p), with control vars`= Int.p_controls) 
+write.csv(t,file.path(paths$stats,'Survey_Paper_means_stats_controlVarsAgeSexMeditYearsMedTypes.csv'))
+```
